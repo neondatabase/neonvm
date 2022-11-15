@@ -38,7 +38,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 	"sigs.k8s.io/controller-runtime/pkg/log"
 
-	vmv1 "github.com/neondatabase/neonvm/api/v1"
+	vmv1 "github.com/neondatabase/neonvm/apis/neonvm/v1"
 )
 
 const virtualmachineFinalizer = "vm.neon.tech/finalizer"

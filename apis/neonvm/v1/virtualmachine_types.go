@@ -214,6 +214,7 @@ const (
 	VmFailed VmPhase = "Failed"
 )
 
+//+genclient
 //+kubebuilder:object:root=true
 //+kubebuilder:subresource:status
 //+kubebuilder:resource:singular=neonvm
