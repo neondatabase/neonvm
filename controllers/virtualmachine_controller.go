@@ -558,8 +558,9 @@ func (r *VirtualMachineReconciler) podForVirtualMachine(
 // labelsForVirtualMachine returns the labels for selecting the resources
 // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/
 func labelsForVirtualMachine(name string) map[string]string {
-	return map[string]string{"app.kubernetes.io/name": "VirtualMachine",
-		"vm.neon.tech/name": name,
+	return map[string]string{
+		"app.kubernetes.io/name": "VirtualMachine",
+		vmv1.VirtualMachineNameLabel: name,
 	}
 }
 
