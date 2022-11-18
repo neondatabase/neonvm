@@ -591,6 +591,9 @@ func (r *VirtualMachineReconciler) podForVirtualMachine(
 		}
 	}
 
+	pod.Spec.Containers = append(pod.Spec.Containers, virtualmachine.Spec.Sidecars...)
+	pod.Spec.Volumes = append(pod.Spec.Volumes, virtualmachine.Spec.ExtraVolumes...)
+
 	// Set the ownerRef for the Pod
 	// More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/owners-dependents/
 	if err := ctrl.SetControllerReference(virtualmachine, pod, r.Scheme); err != nil {
