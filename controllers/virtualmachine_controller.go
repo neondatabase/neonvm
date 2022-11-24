@@ -606,7 +606,7 @@ func (r *VirtualMachineReconciler) podForVirtualMachine(
 // More info: https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/
 func labelsForVirtualMachine(name string) map[string]string {
 	return map[string]string{
-		"app.kubernetes.io/name": "VirtualMachine",
+		"app.kubernetes.io/name":     "VirtualMachine",
 		vmv1.VirtualMachineNameLabel: name,
 	}
 }

@@ -945,7 +945,6 @@ spec:
                             keys must be defined
                           type: boolean
                       type: object
-                      x-kubernetes-map-type: atomic
                     emptyDisk:
                       description: EmptyDisk represents a temporary empty qcow2 disk
                         that shares a vm's lifetime.
