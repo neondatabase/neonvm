@@ -57,6 +57,7 @@ generate: ## Generate boilerplate DeepCopy methods, manifests, and Go client
 	docker build -f hack/Dockerfile.generate --iidfile $$iidfile . && \
 	docker run --rm -v $$PWD:/go/src/github.com/neondatabase/neonvm -w /go/src/github.com/neondatabase/neonvm $$(cat $$iidfile) ./hack/generate.sh && \
 	rm -rf $$iidfile
+	go fmt ./...
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
