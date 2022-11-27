@@ -78,14 +78,11 @@ jobs:
       - name: setup kubernetes tools
         uses: stefanprodan/kube-tools@v1
         with:
-          kustomize:${KUSTOMIZE_VERSION}
-          command: kustomize version --short
-
-      - name: set controller image name:tag in k8s manifests
-        run: cd config/controller && kustomize edit set image controller=${IMG}:${{ steps.get_version.outputs.version }}
-
-      - name: generate neonvm manifests
-        run: kustomize build config/default --output neonvm.yaml
+          kustomize: ${KUSTOMIZE_VERSION}
+          command: |
+            kustomize version --short
+            cd config/controller   && kustomize edit set image controller=${IMG}:${{ steps.get_version.outputs.version }}
+            cd ${GITHUB_WORKSPACE} && kustomize build config/default --output neonvm.yaml
 
       - name: github release
         uses: softprops/action-gh-release@v1
