@@ -247,21 +247,41 @@ func main() {
 	}
 	defer cli.Close()
 
-	// pull source image
-	log.Printf("Pull source docker image: %s\n", *srcImage)
-	pull, err := cli.ImagePull(ctx, *srcImage, types.ImagePullOptions{})
+	hostContainsSrcImage := false
+	hostImages, err := cli.ImageList(ctx, types.ImageListOptions{})
 	if err != nil {
 		log.Fatalln(err)
 	}
-	defer pull.Close()
 
-	// do quiet pull - discard output
-	io.Copy(io.Discard, pull)
-	/*
-	   if err = printReader(pull); err != nil {
-	   	log.Fatalln(err)
-	   }
-	*/
+	for _, img := range hostImages {
+		for _, name := range img.RepoTags {
+			if name == *srcImage {
+				hostContainsSrcImage = true
+				break
+			}
+		}
+		if hostContainsSrcImage {
+			break
+		}
+	}
+
+	if !hostContainsSrcImage {
+		// pull source image
+		log.Printf("Pull source docker image: %s\n", *srcImage)
+		pull, err := cli.ImagePull(ctx, *srcImage, types.ImagePullOptions{})
+		if err != nil {
+			log.Fatalln(err)
+		}
+		defer pull.Close()
+
+		// do quiet pull - discard output
+		io.Copy(io.Discard, pull)
+		/*
+			if err = printReader(pull); err != nil {
+				log.Fatalln(err)
+			}
+		*/
+	}
 
 	log.Printf("Build docker image for virtual machine (disk size %s): %s\n", *size, dstIm)
 	imageSpec, _, err := cli.ImageInspectWithRaw(ctx, *srcImage)
