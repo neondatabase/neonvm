@@ -5,6 +5,16 @@ on:
 #    tags:
 #      - v*
 
+env:
+  KUSTOMIZE_VERSION:        "v4.5.7"
+  CONTROLLER_TOOLS_VERSION: "v0.10.0"
+  CODE_GENERATOR_VERSION:   "v0.25.4"
+  GOFLAGS:                  "-buildvcs=false"
+  IMG:                      neondatabase/neonvm-controller
+  IMG_RUNNER:               neondatabase/neonvm-runner
+  VM_EXAMPLE_SOURCE:        postgres:14-alpine
+  VM_EXAMPLE_IMAGE:         neondatabase/vm-postgres:14-alpine
+
 jobs:
   release:
     runs-on: ubuntu-latest
@@ -12,24 +22,74 @@ jobs:
 
 #      - id: get_version
 #        run: echo ::set-output name=version::${GITHUB_REF/refs\/tags\//}
+      - id: get_version
+        run: echo ::set-output name=version::latest
 
-      - uses: actions/checkout@v3
-      - uses: actions/setup-go@v3
+      - name: git checkout
+        uses: actions/checkout@v3
+      - name: install golang
+        uses: actions/setup-go@v3
         with:
           go-version: '^1.19' # The Go version to download (if necessary) and use.
 
-      - name: Build
-        run: make build
+      - name: build binaries
+        run:  make build
 
-      - uses: docker/setup-qemu-action@v2
-      - uses: docker/setup-buildx-action@v2
-      - uses: docker/login-action@v2
+      - name: generate go code
+        run: |
+          git clone --branch=${CODE_GENERATOR_VERSION} --depth=1 https://github.com/kubernetes/code-generator.git $GOPATH/src/k8s.io/code-generator
+          go install sigs.k8s.io/controller-tools/cmd/controller-gen@${CONTROLLER_TOOLS_VERSION}
+          ${GOPATH}/src/k8s.io/code-generator/generate-groups.sh "deepcopy,client,informer,lister" github.com/neondatabase/neonvm/client github.com/neondatabase/neonvm/apis neonvm:v1 --go-header-file hack/boilerplate.go.txt
+          controller-gen rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+
+      - name: docker - install qemu
+        uses: docker/setup-qemu-action@v2
+      - name: docker - setup buildx
+        uses: docker/setup-buildx-action@v2
+      - name: login to docker hub
+        uses: docker/login-action@v2
         with:
           username: ${{ secrets.NEON_DOCKERHUB_USERNAME }}
           password: ${{ secrets.NEON_DOCKERHUB_PASSWORD }}
 
-      - name: Build and push controlelr image
+      - name: build and push controller image
         uses: docker/build-push-action@v3
         with:
-          push: false
-          tags: neondatabase/neonvm-controller:latest
+          build-args: VM_RUNNER_IMGE=${IMG_RUNNER}:${{ steps.get_version.outputs.version }}
+          context: .
+          platforms: linux/amd64
+          #push: ${{ github.event_name != 'pull_request' }}
+          tags: ${IMG}:${{ steps.get_version.outputs.version }}
+
+      - name: build and push runner image
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          platforms: linux/amd64
+          #push: ${{ github.event_name != 'pull_request' }}
+          file: runner/Dockerfile
+          tags: ${IMG_RUNNER}:${{ steps.get_version.outputs.version }}
+
+      - name: build and push example image
+        run: |
+          bin/vm-builder -src ${VM_EXAMPLE_SOURCE} -dst ${VM_EXAMPLE_IMAGE}
+          docker push -q ${VM_EXAMPLE_IMAGE}
+
+      - name: setup kubernetes tools
+        uses: stefanprodan/kube-tools@v1
+        with:
+          kustomize:${KUSTOMIZE_VERSION}
+          command: kustomize version --short
+
+      - name: set controller image name:tag in k8s manifests
+        run: cd config/controller && kustomize edit set image controller=${IMG}:${{ steps.get_version.outputs.version }}
+
+      - name: generate neonvm manifests
+        run: kustomize build config/default --output neonvm.yaml
+
+      - name: github release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            neonvm.yaml
+            bin/vm-builder
