@@ -5,7 +5,7 @@ VM_EXAMPLE_SOURCE ?= postgres:14-alpine
 VM_EXAMPLE_IMAGE ?= vm-postgres:14-alpine
 
 # kernel for guests
-VM_KERNEL_VERSION ?= "5.15.76"
+VM_KERNEL_VERSION ?= "5.15.80"
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.25.0

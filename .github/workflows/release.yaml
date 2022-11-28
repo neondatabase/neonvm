@@ -6,15 +6,15 @@ on:
 #      - v*
 
 env:
-  KUSTOMIZE_VERSION:        "v4.5.7"
-  CONTROLLER_TOOLS_VERSION: "v0.10.0"
-  CODE_GENERATOR_VERSION:   "v0.25.4"
+  KUSTOMIZE_VERSION:        "4.5.7"
+  CONTROLLER_TOOLS_VERSION: "0.10.0"
+  CODE_GENERATOR_VERSION:   "0.25.4"
   GOFLAGS:                  "-buildvcs=false"
   IMG:                      neondatabase/neonvm-controller
   IMG_RUNNER:               neondatabase/neonvm-runner
   VM_EXAMPLE_SOURCE:        postgres:14-alpine
   VM_EXAMPLE_IMAGE:         neondatabase/vm-postgres:14-alpine
-  VM_KERNEL_VERSION:        "5.15.76"
+  VM_KERNEL_VERSION:        "5.15.80"
 
 jobs:
   release:
@@ -39,8 +39,8 @@ jobs:
 
       - name: generate go code
         run: |
-          git clone --branch=${CODE_GENERATOR_VERSION} --depth=1 https://github.com/kubernetes/code-generator.git ${RUNNER_TEMP}/code-generator
-          go install sigs.k8s.io/controller-tools/cmd/controller-gen@${CONTROLLER_TOOLS_VERSION}
+          git clone --branch=v${{ env.CODE_GENERATOR_VERSION }} --depth=1 https://github.com/kubernetes/code-generator.git ${RUNNER_TEMP}/code-generator
+          go install sigs.k8s.io/controller-tools/cmd/controller-gen@v${{ env.CONTROLLER_TOOLS_VERSION }}
           ${RUNNER_TEMP}/code-generator/generate-groups.sh "deepcopy,client,informer,lister" github.com/neondatabase/neonvm/client github.com/neondatabase/neonvm/apis neonvm:v1 --go-header-file hack/boilerplate.go.txt
           controller-gen rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
@@ -101,6 +101,7 @@ jobs:
 
       - name: github release
         uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
         with:
           files: |
             neonvm.yaml
