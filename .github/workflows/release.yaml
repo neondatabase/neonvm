@@ -56,11 +56,11 @@ jobs:
       - name: build and push controller image
         uses: docker/build-push-action@v3
         with:
-          build-args: VM_RUNNER_IMGE=${IMG_RUNNER}:${{ steps.get_version.outputs.version }}
+          build-args: VM_RUNNER_IMAGE=${{ env.IMG_RUNNER }}:${{ steps.get_version.outputs.version }}
           context: .
           platforms: linux/amd64
           #push: ${{ github.event_name != 'pull_request' }}
-          tags: ${IMG}:${{ steps.get_version.outputs.version }}
+          tags: ${{ env.IMG }}:${{ steps.get_version.outputs.version }}
 
       - name: build and push runner image
         uses: docker/build-push-action@v3
@@ -69,20 +69,20 @@ jobs:
           platforms: linux/amd64
           #push: ${{ github.event_name != 'pull_request' }}
           file: runner/Dockerfile
-          tags: ${IMG_RUNNER}:${{ steps.get_version.outputs.version }}
+          tags: ${{ env.IMG_RUNNER }}:${{ steps.get_version.outputs.version }}
 
       - name: build and push example image
         run: |
-          bin/vm-builder -src ${VM_EXAMPLE_SOURCE} -dst ${VM_EXAMPLE_IMAGE}
-          docker push -q ${VM_EXAMPLE_IMAGE}
+          bin/vm-builder -src ${{ env.VM_EXAMPLE_SOURCE }} -dst ${{ env.VM_EXAMPLE_IMAGE }}
+          docker push -q ${{ env.VM_EXAMPLE_IMAGE }}
 
       - name: setup kubernetes tools
         uses: stefanprodan/kube-tools@v1
         with:
-          kustomize: ${KUSTOMIZE_VERSION}
+          kustomize: ${{ env.KUSTOMIZE_VERSION }}
           command: |
             kustomize version --short
-            cd config/controller   && kustomize edit set image controller=${IMG}:${{ steps.get_version.outputs.version }}
+            cd config/controller   && kustomize edit set image controller=${{ env.IMG }}:${{ steps.get_version.outputs.version }}
             cd ${GITHUB_WORKSPACE} && kustomize build config/default --output neonvm.yaml
 
       - name: github release
