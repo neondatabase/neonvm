@@ -14,6 +14,7 @@ env:
   IMG_RUNNER:               neondatabase/neonvm-runner
   VM_EXAMPLE_SOURCE:        postgres:14-alpine
   VM_EXAMPLE_IMAGE:         neondatabase/vm-postgres:14-alpine
+  VM_KERNEL_VERSION:        "5.15.76"
 
 jobs:
   release:
@@ -53,23 +54,36 @@ jobs:
           username: ${{ secrets.NEON_DOCKERHUB_USERNAME }}
           password: ${{ secrets.NEON_DOCKERHUB_PASSWORD }}
 
-      - name: build and push controller image
+      - name: build linux kernel
         uses: docker/build-push-action@v3
         with:
-          build-args: VM_RUNNER_IMAGE=${{ env.IMG_RUNNER }}:${{ steps.get_version.outputs.version }}
+          build-args: KERNEL_VERSION=${{ env.VM_KERNEL_VERSION }}
           context: .
           platforms: linux/amd64
-          #push: ${{ github.event_name != 'pull_request' }}
-          tags: ${{ env.IMG }}:${{ steps.get_version.outputs.version }}
+          pull: true
+          no-cache: true
+          file: hack/Dockerfile.kernel-builder
+          outputs: type=local,dest=hack/
 
       - name: build and push runner image
         uses: docker/build-push-action@v3
         with:
           context: .
           platforms: linux/amd64
+          push: true
           #push: ${{ github.event_name != 'pull_request' }}
           file: runner/Dockerfile
           tags: ${{ env.IMG_RUNNER }}:${{ steps.get_version.outputs.version }}
+
+      - name: build and push controller image
+        uses: docker/build-push-action@v3
+        with:
+          build-args: VM_RUNNER_IMAGE=${{ env.IMG_RUNNER }}:${{ steps.get_version.outputs.version }}
+          context: .
+          platforms: linux/amd64
+          push: true
+          #push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ env.IMG }}:${{ steps.get_version.outputs.version }}
 
       - name: build and push example image
         run: |
