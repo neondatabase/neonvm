@@ -2,14 +2,14 @@ name: vm-kernel
 
 on:
   schedule:
-    - cron:  '30 * * * *'
+    - cron:  '40 * * * *'
 
 env:
   VM_KERNEL_IMAGE:   "neondatabase/vm-kernel"
   VM_KERNEL_VERSION: "5.15.80"
 
 jobs:
-  release:
+  vm-kernel:
     runs-on: ubuntu-latest
     steps:
 

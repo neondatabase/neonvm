@@ -9,7 +9,7 @@ env:
   VM_EXAMPLE_IMAGE:  neondatabase/vm-postgres:14-alpine
 
 jobs:
-  release:
+  vm-example:
     runs-on: ubuntu-latest
     steps:
 
