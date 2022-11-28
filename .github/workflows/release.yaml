@@ -30,16 +30,17 @@ jobs:
       - name: install golang
         uses: actions/setup-go@v3
         with:
-          go-version: '^1.19' # The Go version to download (if necessary) and use.
+          go-version-file: 'go.mod'
+          cache: true
 
       - name: build binaries
         run:  make build
 
       - name: generate go code
         run: |
-          git clone --branch=${CODE_GENERATOR_VERSION} --depth=1 https://github.com/kubernetes/code-generator.git $GOPATH/src/k8s.io/code-generator
+          git clone --branch=${CODE_GENERATOR_VERSION} --depth=1 https://github.com/kubernetes/code-generator.git ${RUNNER_TEMP}/code-generator
           go install sigs.k8s.io/controller-tools/cmd/controller-gen@${CONTROLLER_TOOLS_VERSION}
-          ${GOPATH}/src/k8s.io/code-generator/generate-groups.sh "deepcopy,client,informer,lister" github.com/neondatabase/neonvm/client github.com/neondatabase/neonvm/apis neonvm:v1 --go-header-file hack/boilerplate.go.txt
+          ${RUNNER_TEMP}/code-generator/generate-groups.sh "deepcopy,client,informer,lister" github.com/neondatabase/neonvm/client github.com/neondatabase/neonvm/apis neonvm:v1 --go-header-file hack/boilerplate.go.txt
           controller-gen rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
 
       - name: docker - install qemu
