@@ -3,6 +3,7 @@ name: vm-kernel
 on:
   schedule:
     - cron:  '40 * * * *'
+  workflow_dispatch: # adds ability to run this manually
 
 env:
   VM_KERNEL_IMAGE:   "neondatabase/vm-kernel"
@@ -15,6 +16,7 @@ jobs:
 
       - name: git checkout
         uses: actions/checkout@v3
+
       - name: docker - install qemu
         uses: docker/setup-qemu-action@v2
       - name: docker - setup buildx
@@ -24,6 +26,7 @@ jobs:
         with:
           username: ${{ secrets.NEON_DOCKERHUB_USERNAME }}
           password: ${{ secrets.NEON_DOCKERHUB_PASSWORD }}
+
       - name: build linux kernel
         uses: docker/build-push-action@v3
         with:
