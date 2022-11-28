@@ -22,9 +22,9 @@ jobs:
     steps:
 
 #      - id: get_version
-#        run: echo ::set-output name=version::${GITHUB_REF/refs\/tags\//}
+#        run: echo "version=${GITHUB_REF/refs\/tags\//}" >> $GITHUB_OUTPUT
       - id: get_version
-        run: echo ::set-output name=version::latest
+        run: echo "version=latest" >> $GITHUB_OUTPUT
 
       - name: git checkout
         uses: actions/checkout@v3
@@ -34,15 +34,15 @@ jobs:
           go-version-file: 'go.mod'
           cache: true
 
-      - name: build binaries
-        run:  make build
-
       - name: generate go code
         run: |
           git clone --branch=v${{ env.CODE_GENERATOR_VERSION }} --depth=1 https://github.com/kubernetes/code-generator.git ${RUNNER_TEMP}/code-generator
           go install sigs.k8s.io/controller-tools/cmd/controller-gen@v${{ env.CONTROLLER_TOOLS_VERSION }}
           ${RUNNER_TEMP}/code-generator/generate-groups.sh "deepcopy,client,informer,lister" github.com/neondatabase/neonvm/client github.com/neondatabase/neonvm/apis neonvm:v1 --go-header-file hack/boilerplate.go.txt
           controller-gen rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+
+      - name: build binaries
+        run:  make build
 
       - name: docker - install qemu
         uses: docker/setup-qemu-action@v2
