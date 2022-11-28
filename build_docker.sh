@@ -22,10 +22,17 @@ docker push "$RUNNER_IMG"
 make kustomize
 KUSTOMIZE=$(pwd)/bin/kustomize
 
+PATCH='
+- op: replace
+  path: /spec/template/spec/containers/0/env/0/value
+  value: '$RUNNER_IMG'
+'
+
 deployts=$(date +%s)
 (
     cd config/controller
     $KUSTOMIZE edit set image controller=$CONTROLLER_IMG
     $KUSTOMIZE edit add annotation redeploy-at:$deployts --force
+    $KUSTOMIZE edit add patch --patch "$PATCH" --kind Deployment
 )
 $KUSTOMIZE build config/default > neonvm.yaml
