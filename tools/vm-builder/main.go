@@ -267,7 +267,7 @@ func main() {
 
 	if !hostContainsSrcImage {
 		// pull source image
-		log.Printf("Pull source docker image: %s\n", *srcImage)
+		log.Printf("Pull source docker image: %s", *srcImage)
 		pull, err := cli.ImagePull(ctx, *srcImage, types.ImagePullOptions{})
 		if err != nil {
 			log.Fatalln(err)
@@ -276,11 +276,6 @@ func main() {
 
 		// do quiet pull - discard output
 		io.Copy(io.Discard, pull)
-		/*
-			if err = printReader(pull); err != nil {
-				log.Fatalln(err)
-			}
-		*/
 	}
 
 	log.Printf("Build docker image for virtual machine (disk size %s): %s\n", *size, dstIm)
