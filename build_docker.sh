@@ -14,7 +14,7 @@ if [ ! -e hack/vmlinuz ]; then
     make kernel
 fi
 
-docker build -t "$CONTROLLER_IMG" .
+docker build -t "$CONTROLLER_IMG" --build-arg VM_RUNNER_IMAGE="$RUNNER_IMG" .
 docker push "$CONTROLLER_IMG"
 docker build -t "$RUNNER_IMG" -f runner/Dockerfile .
 docker push "$RUNNER_IMG"
@@ -32,7 +32,5 @@ deployts=$(date +%s)
 (
     cd config/controller
     $KUSTOMIZE edit set image controller=$CONTROLLER_IMG
-    $KUSTOMIZE edit add annotation redeploy-at:$deployts --force
-    $KUSTOMIZE edit add patch --patch "$PATCH" --kind Deployment
 )
 $KUSTOMIZE build config/default > neonvm.yaml
