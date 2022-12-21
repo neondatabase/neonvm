@@ -202,6 +202,10 @@ sources:
       mountPoints:
         excludes: ["*/proc/sys/fs/binfmt_misc"]
     type: host_metrics
+  postgresql_metrics:
+    endpoints:
+      - "postgres://postgres@localhost:5432"
+    type: postgresql_metrics
   internal_metrics:
     type: internal_metrics
 sinks:
@@ -403,7 +407,7 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	// add 'vminit' file to docker build context
+	// add 'vector.yaml' file to docker build context
 	b.Reset()
 	_, err = b.WriteString(configVector)
 	if err != nil {
