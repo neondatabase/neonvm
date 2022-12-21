@@ -74,8 +74,7 @@ RUN set -e \
 # Install vector.dev binary
 RUN set -e \
     && wget https://packages.timber.io/vector/0.26.0/vector-0.26.0-x86_64-unknown-linux-musl.tar.gz -O - \
-    | tar xzvf - --strip-components 3 -C /neonvm/bin/ ./vector-x86_64-unknown-linux-musl/bin/vector \
-    && ls -l /neonvm/bin/vector
+    | tar xzvf - --strip-components 3 -C /neonvm/bin/ ./vector-x86_64-unknown-linux-musl/bin/vector
     
 # init scripts
 ADD inittab  /neonvm/bin/inittab
