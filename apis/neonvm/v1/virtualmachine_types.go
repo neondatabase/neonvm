@@ -62,6 +62,16 @@ type VirtualMachineSpec struct {
 	// List of disk that can be mounted by virtual machine.
 	// +optional
 	Disks []Disk `json:"disks,omitempty"`
+
+	// Sidecars are containers that run alongside the VM and are recreated on migration
+	//
+	// +optional
+	Sidecars []corev1.Container `json:"sidecars,omitempty"`
+	// ExtraVolumes are available to be mounted in each sidecar, but not the VM. They can be used to
+	// pass in sidecar-specific information that the VM should not have access to.
+	//
+	// +optional
+	ExtraVolumes []corev1.Volume `json:"extraVolumes,omitempty"`
 }
 
 // +kubebuilder:validation:Enum=Always;OnFailure;Never
