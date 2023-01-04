@@ -4,4 +4,3 @@ metadata:
   name: example
 spec:
   vmName: example
-  preventMigrationToSameHost: false

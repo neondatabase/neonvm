@@ -69,26 +69,27 @@ spec:
                 default: true
                 description: Use Auto converge by default
                 type: boolean
-              blockIncremental:
-                default: true
-                description: Trigger incremental migration by default
-                type: boolean
               completionTimeout:
                 default: 3600
-                description: Set 1 hour as default timeout for migration
+                description: 'TODO: not implemented Set 1 hour as default timeout
+                  for migration'
                 format: int32
                 type: integer
+              incremental:
+                default: true
+                description: Trigger incremental disk copy migration by default, otherwise
+                  full disk copy used in migration
+                type: boolean
               maxBandwidth:
                 anyOf:
                 - type: integer
                 - type: string
-                default: 10Gi
-                description: Set 10 Gbit/sec as default for migration bandwidth
+                default: 1Gi
+                description: Set 1 Gbyte/sec as default for migration bandwidth
                 pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
                 x-kubernetes-int-or-string: true
               nodeAffinity:
-                description: Node affinity is a group of node affinity scheduling
-                  rules.
+                description: 'TODO: not implemented'
                 properties:
                   preferredDuringSchedulingIgnoredDuringExecution:
                     description: The scheduler will prefer to schedule pods to nodes
@@ -286,6 +287,7 @@ spec:
               nodeSelector:
                 additionalProperties:
                   type: string
+                description: 'TODO: not implemented'
                 type: object
               preventMigrationToSameHost:
                 default: true
@@ -367,6 +369,41 @@ spec:
                   - type
                   type: object
                 type: array
+              info:
+                properties:
+                  compression:
+                    properties:
+                      compressedSize:
+                        format: int64
+                        type: integer
+                      compressionRate:
+                        format: int64
+                        type: integer
+                    type: object
+                  downtimeMs:
+                    format: int64
+                    type: integer
+                  ram:
+                    properties:
+                      remaining:
+                        format: int64
+                        type: integer
+                      total:
+                        format: int64
+                        type: integer
+                      transferred:
+                        format: int64
+                        type: integer
+                    type: object
+                  setupTimeMs:
+                    format: int64
+                    type: integer
+                  status:
+                    type: string
+                  totalTimeMs:
+                    format: int64
+                    type: integer
+                type: object
               phase:
                 description: The phase of a VM is a simple, high-level summary of
                   where the VM is in its lifecycle.

@@ -24,14 +24,16 @@ import (
 
 const MigrationPort int32 = 20187
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
 // VirtualMachineMigrationSpec defines the desired state of VirtualMachineMigration
 type VirtualMachineMigrationSpec struct {
 	VmName string `json:"vmName"`
+
+	// TODO: not implemented
 	// +optional
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
+	// TODO: not implemented
 	// +optional
 	NodeAffinity *corev1.NodeAffinity `json:"nodeAffinity,omitempty"`
 
@@ -39,22 +41,16 @@ type VirtualMachineMigrationSpec struct {
 	// +kubebuilder:default:=true
 	PreventMigrationToSameHost bool `json:"preventMigrationToSameHost"`
 
+	// TODO: not implemented
 	// Set 1 hour as default timeout for migration
 	// +optional
 	// +kubebuilder:default:=3600
 	CompletionTimeout int32 `json:"completionTimeout"`
 
-	// Trigger incremental migration by default
+	// Trigger incremental disk copy migration by default, otherwise full disk copy used in migration
 	// +optional
 	// +kubebuilder:default:=true
-	BlockIncremental bool `json:"blockIncremental"`
-
-	/*
-		// Trigger compressed migration by default
-		// +optional
-		// +kubebuilder:default:=true
-		Compress bool `json:"compress"`
-	*/
+	Incremental bool `json:"incremental"`
 
 	// Use PostCopy migration by default
 	// +optional
@@ -66,38 +62,11 @@ type VirtualMachineMigrationSpec struct {
 	// +kubebuilder:default:=true
 	AutoConverge bool `json:"autoConverge"`
 
-	// Set 10 Gbit/sec as default for migration bandwidth
+	// Set 1 Gbyte/sec as default for migration bandwidth
 	// +optional
-	// +kubebuilder:default:="10Gi"
+	// +kubebuilder:default:="1Gi"
 	MaxBandwidth resource.Quantity `json:"maxBandwidth"`
-
-	/*
-	   // xbzrle cache settings
-	   // +optional
-	   XbzrleCache XbzrleCache `json:"xbzrleCache"`
-
-	   // Use Zero blokcs by default
-	   // +optional
-	   // +kubebuilder:default:=true
-	   ZeroBlocks bool `json:"zeroBlocks"`
-
-	   // Use zstd engine for Multi FD compression
-	   // +optional
-	   // +kubebuilder:default:="zstd"
-	   MultifdCompression string `json:"multifdCompression"`
-	*/
 }
-
-/*
-type XbzrleCache struct {
-	// +optional
-	// +kubebuilder:default:=true
-	Enabled bool `json:"enabled"`
-	// +optional
-	// +kubebuilder:default:="256Mi"
-	Size resource.Quantity `json:"size"`
-}
-*/
 
 // VirtualMachineMigrationStatus defines the observed state of VirtualMachineMigration
 type VirtualMachineMigrationStatus struct {
@@ -127,6 +96,39 @@ type VirtualMachineMigrationStatus struct {
 	SourceNode string `json:"sourceNode,omitempty"`
 	// +optional
 	TargetNode string `json:"targetNode,omitempty"`
+	// +optional
+	Info MigrationInfo `json:"info,omitempty"`
+}
+
+type MigrationInfo struct {
+	// +optional
+	Status string `json:"status,omitempty"`
+	// +optional
+	TotalTimeMs int64 `json:"totalTimeMs,omitempty"`
+	// +optional
+	SetupTimeMs int64 `json:"setupTimeMs,omitempty"`
+	// +optional
+	DowntimeMs int64 `json:"downtimeMs,omitempty"`
+	// +optional
+	Ram MigrationInfoRam `json:"ram,omitempty"`
+	// +optional
+	Compression MigrationInfoCompression `json:"compression,omitempty"`
+}
+
+type MigrationInfoRam struct {
+	// +optional
+	Transferred int64 `json:"transferred,omitempty"`
+	// +optional
+	Remaining int64 `json:"remaining,omitempty"`
+	// +optional
+	Total int64 `json:"total,omitempty"`
+}
+
+type MigrationInfoCompression struct {
+	// +optional
+	CompressedSize int64 `json:"compressedSize,omitempty"`
+	// +optional
+	CompressionRate int64 `json:"compressionRate,omitempty"`
 }
 
 type VmmPhase string
@@ -143,31 +145,6 @@ const (
 	// VmmFailed means that migration failed
 	VmmFailed VmmPhase = "Failed"
 )
-
-/*
-status:
-  migrationStatus: completed
-  completionTimestamp: 2022-12-22T01:01:03Z
-  totaltime: 128212 ms
-  downtime: 63 ms
-  throughput: 1087Mi
-  sourceNode: node1
-  targetNode: node2
-  targetVmName: example-abc
-  targetPodName: example-abc-def-12345
-  memory:
-    transferred: 228391Ki
-    remaining: 0Ki
-    total: 8Gi
-    precopy: 202371Ki
-    downtime: 26020Ki
-  pages:
-    pageSize: 4Ki
-    duplicate: 2045389
-    skipped: 0
-    normal: 52501
-    pagesPerSecond: 32710
-*/
 
 //+genclient
 //+kubebuilder:object:root=true

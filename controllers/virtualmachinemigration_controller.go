@@ -19,6 +19,7 @@ package controllers
 import (
 	"context"
 	"fmt"
+	"math"
 	"reflect"
 	"time"
 
@@ -311,27 +312,31 @@ func (r *VirtualMachineMigrationReconciler) doReconcile(ctx context.Context, vir
 			virtualmachinemigration.Status.SourcePodName = vm.Status.PodName
 			virtualmachinemigration.Status.SourcePodIP = vm.Status.PodIP
 			virtualmachinemigration.Status.TargetPodIP = targetRunner.Status.PodIP
-			// update VM status
-			vm.Status.Phase = vmv1.VmMigrating
-			if err := r.Status().Update(ctx, vm); err != nil {
-				log.Error(err, "Failed to update VirtualMachine status to 'Migrating'")
-				return err
+
+			// Migrate only running VMs
+			if vm.Status.Phase == vmv1.VmRunning {
+				// update VM status
+				vm.Status.Phase = vmv1.VmMigrating
+				if err := r.Status().Update(ctx, vm); err != nil {
+					log.Error(err, "Failed to update VirtualMachine status to 'Migrating'")
+					return err
+				}
+				meta.SetStatusCondition(&virtualmachinemigration.Status.Conditions,
+					metav1.Condition{Type: typeAvailableVirtualMachineMigration,
+						Status:  metav1.ConditionTrue,
+						Reason:  "Reconciling",
+						Message: fmt.Sprintf("Target Pod (%s) for VirtualMachine (%s) created successfully", targetRunner.Name, vm.Name)})
+				// trigger migration
+				if err := QmpStartMigration(vm, virtualmachinemigration); err != nil {
+					virtualmachinemigration.Status.Phase = vmv1.VmmFailed
+					return err
+				}
+				r.Recorder.Event(virtualmachinemigration, "Normal", "Started",
+					fmt.Sprintf("VirtualMachine (%s) live migration started to target pod (%s)",
+						vm.Name, targetRunner.Name))
+				// finnaly update migration phase to Running
+				virtualmachinemigration.Status.Phase = vmv1.VmmRunning
 			}
-			meta.SetStatusCondition(&virtualmachinemigration.Status.Conditions,
-				metav1.Condition{Type: typeAvailableVirtualMachineMigration,
-					Status:  metav1.ConditionTrue,
-					Reason:  "Reconciling",
-					Message: fmt.Sprintf("Target Pod (%s) for VirtualMachine (%s) created successfully", targetRunner.Name, vm.Name)})
-			// trigger migration
-			if err := QmpStartMigration(vm, virtualmachinemigration); err != nil {
-				virtualmachinemigration.Status.Phase = vmv1.VmmFailed
-				return err
-			}
-			r.Recorder.Event(virtualmachinemigration, "Normal", "Started",
-				fmt.Sprintf("VirtualMachine (%s) live migration started to target pod (%s)",
-					vm.Name, targetRunner.Name))
-			// finnaly update migration phase to Running
-			virtualmachinemigration.Status.Phase = vmv1.VmmRunning
 		case corev1.PodSucceeded:
 			// target runner pod finsihed without error? but it shouldn't finish
 			virtualmachinemigration.Status.Phase = vmv1.VmmFailed
@@ -366,7 +371,7 @@ func (r *VirtualMachineMigrationReconciler) doReconcile(ctx context.Context, vir
 			// lost target pod for running Migration ?
 			virtualmachinemigration.Status.Phase = vmv1.VmmFailed
 
-			r.Recorder.Event(virtualmachinemigration, "Warning", "NotFound",
+			r.Recorder.Event(virtualmachinemigration, "Fatal", "NotFound",
 				fmt.Sprintf("Target Pod (%s) for VirtualMachine (%s) disappeared",
 					virtualmachinemigration.Status.TargetPodName, vm.Name))
 
@@ -387,8 +392,19 @@ func (r *VirtualMachineMigrationReconciler) doReconcile(ctx context.Context, vir
 			return err
 		}
 
-		// DEBUG
-		log.Info("MIGRATION INFO", "Info", migrationInfo)
+		// TODO: delete this log as it used for debug mostly
+		log.Info("Migration info", "Info", migrationInfo)
+
+		// Store/update migration info in VirtualMachineMigration.Status
+		virtualmachinemigration.Status.Info.Status = migrationInfo.Status
+		virtualmachinemigration.Status.Info.TotalTimeMs = migrationInfo.TotalTimeMs
+		virtualmachinemigration.Status.Info.SetupTimeMs = migrationInfo.SetupTimeMs
+		virtualmachinemigration.Status.Info.DowntimeMs = migrationInfo.DowntimeMs
+		virtualmachinemigration.Status.Info.Ram.Transferred = migrationInfo.Ram.Transferred
+		virtualmachinemigration.Status.Info.Ram.Remaining = migrationInfo.Ram.Remaining
+		virtualmachinemigration.Status.Info.Ram.Total = migrationInfo.Ram.Total
+		virtualmachinemigration.Status.Info.Compression.CompressedSize = migrationInfo.Compression.CompressedSize
+		virtualmachinemigration.Status.Info.Compression.CompressionRate = int64(math.Round(migrationInfo.Compression.CompressionRate))
 
 		// check if migration done
 		if migrationInfo.Status == "completed" {
@@ -414,6 +430,12 @@ func (r *VirtualMachineMigrationReconciler) doReconcile(ctx context.Context, vir
 			}
 			if err := r.Update(ctx, targetRunner); err != nil {
 				log.Error(err, "Failed to update ownerRef for target runner pod")
+				return err
+			}
+
+			// stop hypervisor in source runner
+			if err := QmpQuit(virtualmachinemigration.Status.SourcePodIP, vm.Spec.QMP); err != nil {
+				log.Error(err, "Failed stop hypervisor in source runner pod")
 				return err
 			}
 

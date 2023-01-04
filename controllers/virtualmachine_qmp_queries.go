@@ -57,16 +57,16 @@ type QmpMemoryDevice struct {
 	} `json:"data"`
 }
 
-type QmpMigrationInfoRaw struct {
-	Return QmpMigrationInfo `json:"return"`
+type QmpMigrationInfo struct {
+	Return MigrationInfo `json:"return"`
 }
 
-type QmpMigrationInfo struct {
-	Status    string `json:"status"`
-	TotalTime int64  `json:"total-time"`
-	SetupTime int64  `json:"setup-time"`
-	Downtime  int64  `json:"downtime"`
-	Ram       struct {
+type MigrationInfo struct {
+	Status      string `json:"status"`
+	TotalTimeMs int64  `json:"total-time"`
+	SetupTimeMs int64  `json:"setup-time"`
+	DowntimeMs  int64  `json:"downtime"`
+	Ram         struct {
 		Transferred    int64 `json:"transferred"`
 		Remaining      int64 `json:"remaining"`
 		Total          int64 `json:"total"`
@@ -75,11 +75,10 @@ type QmpMigrationInfo struct {
 		NormalBytes    int64 `json:"normal-bytes"`
 		DirtySyncCount int64 `json:"dirty-sync-count"`
 	} `json:"ram"`
-	Disk struct {
-		Total       int64 `json:"total"`
-		Remaining   int64 `json:"remaining"`
-		Transferred int64 `json:"transferred"`
-	} `json:"disk"`
+	Compression struct {
+		CompressedSize  int64   `json:"compressed-size"`
+		CompressionRate float64 `json:"compression-rate"`
+	} `json:"compression"`
 }
 
 func QmpConnect(virtualmachine *vmv1.VirtualMachine) (*qmp.SocketMonitor, error) {
@@ -334,21 +333,21 @@ func QmpStartMigration(virtualmachine *vmv1.VirtualMachine, virtualmachinemigrat
 	defer tmon.Disconnect()
 
 	qmpcmd := []byte{}
-
+	cache := resource.MustParse("256Mi")
 	// setup migration on source runner
 	qmpcmd = []byte(fmt.Sprintf(`{
 		"execute": "migrate-set-capabilities",
 		"arguments":
 		    {
 			"capabilities": [
-			    {"capability": "postcopy-ram",  "state": true},
+			    {"capability": "postcopy-ram",  "state": %t},
 			    {"capability": "xbzrle",        "state": true},
 			    {"capability": "compress",      "state": true},
-			    {"capability": "auto-converge", "state": true},
+			    {"capability": "auto-converge", "state": %t},
 			    {"capability": "zero-blocks",   "state": true}
 			]
 		    }
-		}`))
+		}`, virtualmachinemigration.Spec.AllowPostCopy, virtualmachinemigration.Spec.AutoConverge))
 	_, err = smon.Run(qmpcmd)
 	if err != nil {
 		return err
@@ -357,11 +356,11 @@ func QmpStartMigration(virtualmachine *vmv1.VirtualMachine, virtualmachinemigrat
 		"execute": "migrate-set-parameters",
 		"arguments":
 		    {
-			"xbzrle-cache-size":   268435456,
-			"max-bandwidth":       1342177280,
+			"xbzrle-cache-size":   %d,
+			"max-bandwidth":       %d,
 			"multifd-compression": "zstd"
 		    }
-		}`))
+		}`, cache.Value(), virtualmachinemigration.Spec.MaxBandwidth.Value()))
 	_, err = smon.Run(qmpcmd)
 	if err != nil {
 		return err
@@ -373,14 +372,14 @@ func QmpStartMigration(virtualmachine *vmv1.VirtualMachine, virtualmachinemigrat
 		"arguments":
 		    {
 			"capabilities": [
-			    {"capability": "postcopy-ram",  "state": true},
+			    {"capability": "postcopy-ram",  "state": %t},
 			    {"capability": "xbzrle",        "state": true},
 			    {"capability": "compress",      "state": true},
-			    {"capability": "auto-converge", "state": true},
+			    {"capability": "auto-converge", "state": %t},
 			    {"capability": "zero-blocks",   "state": true}
 			]
 		    }
-		}`))
+		}`, virtualmachinemigration.Spec.AllowPostCopy, virtualmachinemigration.Spec.AutoConverge))
 	_, err = tmon.Run(qmpcmd)
 	if err != nil {
 		return err
@@ -389,11 +388,11 @@ func QmpStartMigration(virtualmachine *vmv1.VirtualMachine, virtualmachinemigrat
 		"execute": "migrate-set-parameters",
 		"arguments":
 		    {
-			"xbzrle-cache-size":   268435456,
-			"max-bandwidth":       1342177280,
+			"xbzrle-cache-size":   %d,
+			"max-bandwidth":       %d,
 			"multifd-compression": "zstd"
 		    }
-		}`))
+		}`, cache.Value(), virtualmachinemigration.Spec.MaxBandwidth.Value()))
 	_, err = tmon.Run(qmpcmd)
 	if err != nil {
 		return err
@@ -405,9 +404,10 @@ func QmpStartMigration(virtualmachine *vmv1.VirtualMachine, virtualmachinemigrat
 		"arguments":
 		    {
 			"uri": "tcp:%s:%d",
-			"inc":true
+			"inc": %t,
+			"blk": %t
 		    }
-		}`, t_ip, vmv1.MigrationPort))
+		}`, t_ip, vmv1.MigrationPort, virtualmachinemigration.Spec.Incremental, !virtualmachinemigration.Spec.Incremental))
 	_, err = smon.Run(qmpcmd)
 	if err != nil {
 		return err
@@ -421,8 +421,8 @@ func QmpStartMigration(virtualmachine *vmv1.VirtualMachine, virtualmachinemigrat
 	return nil
 }
 
-func QmpGetMigrationInfo(virtualmachine *vmv1.VirtualMachine) (QmpMigrationInfo, error) {
-	empty := QmpMigrationInfo{}
+func QmpGetMigrationInfo(virtualmachine *vmv1.VirtualMachine) (MigrationInfo, error) {
+	empty := MigrationInfo{}
 	mon, err := QmpConnect(virtualmachine)
 	if err != nil {
 		return empty, err
@@ -435,8 +435,27 @@ func QmpGetMigrationInfo(virtualmachine *vmv1.VirtualMachine) (QmpMigrationInfo,
 		return empty, err
 	}
 
-	var result QmpMigrationInfoRaw
+	var result QmpMigrationInfo
 	json.Unmarshal(raw, &result)
 
 	return result.Return, nil
+}
+
+func QmpQuit(ip string, port int32) error {
+	mon, err := qmp.NewSocketMonitor("tcp", fmt.Sprintf("%s:%d", ip, port), 2*time.Second)
+	if err != nil {
+		return err
+	}
+	if err := mon.Connect(); err != nil {
+		return err
+	}
+	defer mon.Disconnect()
+
+	qmpcmd := []byte(fmt.Sprintf(`{"execute": "quit"}`))
+	_, err = mon.Run(qmpcmd)
+	if err != nil {
+		return err
+	}
+
+	return nil
 }
