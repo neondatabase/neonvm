@@ -16,11 +16,22 @@ spec:
   scope: Namespaced
   versions:
   - additionalPrinterColumns:
+    - jsonPath: .spec.vmName
+      name: VM
+      type: string
     - jsonPath: .status.sourcePodName
       name: Source
       type: string
+    - jsonPath: .status.sourcePodIP
+      name: SourceIP
+      priority: 1
+      type: string
     - jsonPath: .status.targetPodName
       name: Target
+      type: string
+    - jsonPath: .status.targetPodIP
+      name: TargetIP
+      priority: 1
       type: string
     - jsonPath: .status.phase
       name: Status
@@ -276,6 +287,9 @@ spec:
                 additionalProperties:
                   type: string
                 type: object
+              preventMigrationToSameHost:
+                default: true
+                type: boolean
               vmName:
                 type: string
             required:

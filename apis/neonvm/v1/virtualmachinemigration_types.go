@@ -22,6 +22,8 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
+const MigrationPort int32 = 20187
+
 // EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
 // NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
 
@@ -32,6 +34,10 @@ type VirtualMachineMigrationSpec struct {
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 	// +optional
 	NodeAffinity *corev1.NodeAffinity `json:"nodeAffinity,omitempty"`
+
+	// +optional
+	// +kubebuilder:default:=true
+	PreventMigrationToSameHost bool `json:"preventMigrationToSameHost"`
 
 	// Set 1 hour as default timeout for migration
 	// +optional
@@ -169,8 +175,11 @@ status:
 //+kubebuilder:resource:singular=neonvmm
 
 // VirtualMachineMigration is the Schema for the virtualmachinemigrations API
+// +kubebuilder:printcolumn:name="VM",type=string,JSONPath=`.spec.vmName`
 // +kubebuilder:printcolumn:name="Source",type=string,JSONPath=`.status.sourcePodName`
+// +kubebuilder:printcolumn:name="SourceIP",type=string,priority=1,JSONPath=`.status.sourcePodIP`
 // +kubebuilder:printcolumn:name="Target",type=string,JSONPath=`.status.targetPodName`
+// +kubebuilder:printcolumn:name="TargetIP",type=string,priority=1,JSONPath=`.status.targetPodIP`
 // +kubebuilder:printcolumn:name="Status",type=string,JSONPath=`.status.phase`
 // +kubebuilder:printcolumn:name="Age",type="date",JSONPath=".metadata.creationTimestamp"
 type VirtualMachineMigration struct {
