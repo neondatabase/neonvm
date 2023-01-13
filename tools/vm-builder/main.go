@@ -90,6 +90,7 @@ COPY --from=rootdisk / /rootdisk
 COPY --from=vm-runtime /neonvm /rootdisk/neonvm
 RUN set -e \
     && mkdir -p /rootdisk/etc \
+    && mkdir /rootdisk/etc/vector \
     && cp -f /rootdisk/neonvm/bin/inittab /rootdisk/etc/inittab \
     && mkfs.ext4 -L vmroot -d /rootdisk /disk.raw ${DISK_SIZE} \
     && qemu-img convert -f raw -O qcow2 -o cluster_size=2M,lazy_refcounts=on /disk.raw /disk.qcow2
