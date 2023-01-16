@@ -3,6 +3,7 @@ IMG ?= controller:dev
 IMG_RUNNER ?= runner:dev
 VM_EXAMPLE_SOURCE ?= postgres:15-alpine
 VM_EXAMPLE_IMAGE ?= vm-postgres:15-alpine
+VXLAN_IMAGE ?= vxlan-controller:dev
 
 # kernel for guests
 VM_KERNEL_VERSION ?= "5.15.80"
@@ -96,6 +97,7 @@ docker-build: build test ## Build docker image with the controller.
 	docker build --build-arg VM_RUNNER_IMAGE=$(IMG_RUNNER) -t $(IMG) .
 	docker build -t $(IMG_RUNNER) -f runner/Dockerfile .
 	bin/vm-builder -src $(VM_EXAMPLE_SOURCE) -dst $(VM_EXAMPLE_IMAGE)
+	docker build -t $(VXLAN_IMAGE) -f tools/vxlan-controller/Dockerfile .
 
 #.PHONY: docker-push
 #docker-push: ## Push docker image with the controller.
@@ -197,3 +199,5 @@ kind-load: docker-build  ## Push docker images to the kind cluster.
 	kind load docker-image $(IMG)
 	kind load docker-image $(IMG_RUNNER)
 	kind load docker-image $(VM_EXAMPLE_IMAGE)
+	kind load docker-image $(VXLAN_IMAGE)
+
