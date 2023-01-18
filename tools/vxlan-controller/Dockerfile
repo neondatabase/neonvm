@@ -32,4 +32,3 @@ RUN apk add --no-cache \
 COPY --from=builder /vxlan-controller /usr/bin/vxlan-controller
 
 ENTRYPOINT ["/sbin/tini", "--", "vxlan-controller"]
-CMD ["setup"]

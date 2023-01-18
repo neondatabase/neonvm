@@ -3,36 +3,11 @@ package main
 import (
 	"context"
 	"flag"
+	"log"
 	"net"
 	"os"
 	"syscall"
 	"time"
-	//	"encoding/base64"
-	//	"encoding/json"
-
-	//	"bytes"
-	//	"flag"
-	//	"fmt"
-	//	"io/ioutil"
-	"log"
-	//	"math"
-	//	"net"
-	//	"os"
-	//	"os/exec"
-	//	"path/filepath"
-	//	"regexp"
-	//	"strings"
-	//	"sync"
-
-	//	"github.com/alessio/shellescape"
-	//	"github.com/cilium/cilium/pkg/mac"
-	//	"github.com/docker/docker/pkg/ioutils"
-	//	"github.com/docker/libnetwork/types"
-	//	"github.com/kdomanski/iso9660"
-	//	"github.com/vishvananda/netlink"
-	//	"k8s.io/apimachinery/pkg/api/resource"
-
-	//	vmv1 "github.com/neondatabase/neonvm/apis/neonvm/v1"
 
 	"github.com/vishvananda/netlink"
 
@@ -134,10 +109,7 @@ func main() {
 
 func getNodesIPs(clientset *kubernetes.Clientset) ([]string, error) {
 	ips := []string{}
-	// exclude control-plane nodes from list
-	nodes, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{
-		LabelSelector: "node-role.kubernetes.io/control-plane!=",
-	})
+	nodes, err := clientset.CoreV1().Nodes().List(context.TODO(), metav1.ListOptions{})
 	if err != nil {
 		return ips, err
 	}
