@@ -5,6 +5,8 @@ VM_EXAMPLE_SOURCE ?= postgres:15-alpine
 VM_EXAMPLE_IMAGE ?= vm-postgres:15-alpine
 VXLAN_IMAGE ?= vxlan-controller:dev
 
+MULTUS_CNI ?= https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/v3.9.3/deployments/multus-daemonset-thick-plugin.yml
+
 # kernel for guests
 VM_KERNEL_VERSION ?= "5.15.80"
 
@@ -137,15 +139,26 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 
 DEPLOYTS := $(shell date +%s)
 .PHONY: deploy
-deploy: kind-load manifests kustomize install ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+deploy: kind-load manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+	$(KUSTOMIZE) build config/overlay_network/multus | kubectl apply -f -
+	kubectl -n kube-system rollout status  daemonset kube-multus-ds
+	$(KUSTOMIZE) build config/overlay_network/whereabouts | kubectl apply -f -
+	kubectl -n kube-system rollout status  daemonset whereabouts
 	cd config/controller && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 	kubectl -n neonvm-system rollout restart deployment neonvm-controller
 	kubectl -n neonvm-system rollout status  deployment neonvm-controller
+	cd config/overlay_network/vxlan-controller && $(KUSTOMIZE) edit set image vxlan-controller=$(VXLAN_IMAGE)
+	$(KUSTOMIZE) build config/overlay_network | kubectl apply -f -
+	kubectl -n neonvm-system rollout restart daemonset vxlan-controller
+	kubectl -n neonvm-system rollout status  daemonset vxlan-controller
 
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
 	$(KUSTOMIZE) build config/default | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+	$(KUSTOMIZE) build config/overlay_network | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+	$(KUSTOMIZE) build config/overlay_network/multus | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+	$(KUSTOMIZE) build config/overlay_network/whereabouts | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
 
 ##@ Build Dependencies
 
