@@ -62,6 +62,10 @@ type VirtualMachineSpec struct {
 	// List of disk that can be mounted by virtual machine.
 	// +optional
 	Disks []Disk `json:"disks,omitempty"`
+
+	// Extra network interface attached to network provided by Mutlus CNI.
+	// +optional
+	ExtraNetwork *ExtraNetwork `json:"extraNetwork,omitempty"`
 }
 
 // +kubebuilder:validation:Enum=Always;OnFailure;Never
@@ -210,6 +214,15 @@ type DiskSource struct {
 
 type EmptyDiskSource struct {
 	Size resource.Quantity `json:"size"`
+}
+
+type ExtraNetwork struct {
+	// Interface name.
+	// +kubebuilder:default:=net1
+	Interface string `json:"interface"`
+	// Multus Network name specified in network-attachments-definition.
+	MultusNetwork   string `json:"multusNetwork"`
+	MultusNetworkL2 string `json:"multusNetworkL2"`
 }
 
 // VirtualMachineStatus defines the observed state of VirtualMachine
