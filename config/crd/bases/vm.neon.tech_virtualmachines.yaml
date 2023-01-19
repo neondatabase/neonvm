@@ -1071,6 +1071,24 @@ spec:
                   - name
                   type: object
                 type: array
+              extraNetwork:
+                description: Extra network interface attached to network provided
+                  by Mutlus CNI.
+                properties:
+                  interface:
+                    default: net1
+                    description: Interface name.
+                    type: string
+                  multusNetwork:
+                    description: Multus Network name specified in network-attachments-definition.
+                    type: string
+                  multusNetworkL2:
+                    type: string
+                required:
+                - interface
+                - multusNetwork
+                - multusNetworkL2
+                type: object
               guest:
                 properties:
                   args:

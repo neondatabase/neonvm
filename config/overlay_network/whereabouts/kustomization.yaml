@@ -8,4 +8,4 @@ bases:
 
 resources:
 - network.yaml
-- network-no-ipam.yaml
+- network-no-ip.yaml

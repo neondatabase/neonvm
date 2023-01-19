@@ -660,6 +660,11 @@ func podSpec(virtualmachine *vmv1.VirtualMachine) (*corev1.Pod, error) {
 		}
 	}
 
+	// use L3 multus netwoork (wit IPAM)
+	if virtualmachine.Spec.ExtraNetwork != nil {
+		pod.Annotations["k8s.v1.cni.cncf.io/networks"] = fmt.Sprintf("%s@%s", virtualmachine.Spec.ExtraNetwork.MultusNetwork, virtualmachine.Spec.ExtraNetwork.Interface)
+	}
+
 	return pod, nil
 }
 
