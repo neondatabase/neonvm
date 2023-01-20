@@ -169,6 +169,10 @@ mount -t cgroup cgroup /sys/fs/cgroup
 mount -t devpts -o noexec,nosuid       devpts    /dev/pts
 mount -t tmpfs  -o noexec,nosuid,nodev shm-tmpfs /dev/shm
 
+# mount a big diskcache
+mkdir -p /neonvm/cache
+mount -t tmpfs -o size=100G tmpfs /neonvm/cache
+
 # neonvm runtime params mounted as iso9660 disk
 mount -o ro,mode=0644 /dev/vdb /neonvm/runtime
 
@@ -197,11 +201,11 @@ sources:
   host_metrics:
     filesystem:
       devices:
-        excludes: [binfmt_misc]
+	excludes: [binfmt_misc]
       filesystems:
-        excludes: [binfmt_misc]
+	excludes: [binfmt_misc]
       mountPoints:
-        excludes: ["*/proc/sys/fs/binfmt_misc"]
+	excludes: ["*/proc/sys/fs/binfmt_misc"]
     type: host_metrics
 sinks:
   prom_exporter:
