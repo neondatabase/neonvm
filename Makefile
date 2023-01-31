@@ -5,13 +5,11 @@ VM_EXAMPLE_SOURCE ?= postgres:15-alpine
 VM_EXAMPLE_IMAGE ?= vm-postgres:15-alpine
 VXLAN_IMAGE ?= vxlan-controller:dev
 
-MULTUS_CNI ?= https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/v3.9.3/deployments/multus-daemonset-thick-plugin.yml
-
 # kernel for guests
 VM_KERNEL_VERSION ?= "5.15.80"
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
-ENVTEST_K8S_VERSION = 1.25.0
+ENVTEST_K8S_VERSION = 1.23.0
 
 # Get the currently used golang base path
 GOPATH=$(shell go env GOPATH)
@@ -99,7 +97,7 @@ docker-build: build test ## Build docker image with the controller.
 	docker build --build-arg VM_RUNNER_IMAGE=$(IMG_RUNNER) -t $(IMG) .
 	docker build -t $(IMG_RUNNER) -f runner/Dockerfile .
 	bin/vm-builder -src $(VM_EXAMPLE_SOURCE) -dst $(VM_EXAMPLE_IMAGE)
-	docker build -t $(VXLAN_IMAGE) -f tools/vxlan-controller/Dockerfile .
+	docker build -t $(VXLAN_IMAGE) -f tools/vxlan/Dockerfile .
 
 #.PHONY: docker-push
 #docker-push: ## Push docker image with the controller.
@@ -129,6 +127,17 @@ ifndef ignore-not-found
   ignore-not-found = false
 endif
 
+.PHONY: kernel
+kernel: ## Build linux kernel.
+	rm -f hack/vmlinuz
+	docker buildx build \
+		--build-arg KERNEL_VERSION=$(VM_KERNEL_VERSION) \
+		--output type=local,dest=hack/ \
+		--platform linux/amd64 \
+		--pull \
+		--no-cache \
+		--file hack/Dockerfile.kernel-builder .
+
 .PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/crd | kubectl apply -f -
@@ -140,25 +149,41 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 DEPLOYTS := $(shell date +%s)
 .PHONY: deploy
 deploy: kind-load manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	$(KUSTOMIZE) build config/overlay_network/multus | kubectl apply -f -
-	kubectl -n kube-system rollout status  daemonset kube-multus-ds
-	$(KUSTOMIZE) build config/overlay_network/whereabouts | kubectl apply -f -
-	kubectl -n kube-system rollout status  daemonset whereabouts
 	cd config/controller && $(KUSTOMIZE) edit set image controller=$(IMG)
 	$(KUSTOMIZE) build config/default | kubectl apply -f -
 	kubectl -n neonvm-system rollout restart deployment neonvm-controller
 	kubectl -n neonvm-system rollout status  deployment neonvm-controller
 	cd config/overlay_network/vxlan-controller && $(KUSTOMIZE) edit set image vxlan-controller=$(VXLAN_IMAGE)
+	cd config/overlay_network/vxlan-ipam       && $(KUSTOMIZE) edit set image vxlan-controller=$(VXLAN_IMAGE)
 	$(KUSTOMIZE) build config/overlay_network | kubectl apply -f -
+	kubectl -n neonvm-system rollout restart deployment vxlan-ipam
+	kubectl -n neonvm-system rollout status  deployment vxlan-ipam
 	kubectl -n neonvm-system rollout restart daemonset vxlan-controller
 	kubectl -n neonvm-system rollout status  daemonset vxlan-controller
+	kubectl -n kube-system   rollout status  daemonset kube-multus-ds
+	$(KUSTOMIZE) build config/overlay_network/network | kubectl apply -f -
 
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/default | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
-	$(KUSTOMIZE) build config/overlay_network | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
-	$(KUSTOMIZE) build config/overlay_network/multus | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
-	$(KUSTOMIZE) build config/overlay_network/whereabouts | kubectl delete --ignore-not-found=$(ignore-not-found) -f -
+	$(KUSTOMIZE) build config/default | kubectl delete --ignore-not-found=$(ignore-not-found) -f - || true
+	$(KUSTOMIZE) build config/overlay_network | kubectl delete --ignore-not-found=$(ignore-not-found) -f - || true
+
+##@ Local cluster
+
+.PHONY: local-cluster
+local-cluster:  ## Create local cluster by kind tool and prepared config
+	kind create cluster --config hack/kind.yaml
+	kubectl apply -f https://raw.githubusercontent.com/projectcalico/calico/v3.25.0/manifests/calico.yaml
+	kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
+	kubectl wait -n kube-system deployment calico-kube-controllers --for condition=Available --timeout -1s
+	kubectl wait -n cert-manager deployment cert-manager --for condition=Available --timeout -1s
+
+.PHONY: kind-load
+kind-load: docker-build  ## Push docker images to the kind cluster.
+	kind load docker-image $(IMG)
+	kind load docker-image $(IMG_RUNNER)
+	kind load docker-image $(VM_EXAMPLE_IMAGE)
+	kind load docker-image $(VXLAN_IMAGE)
 
 ##@ Build Dependencies
 
@@ -192,25 +217,8 @@ controller-gen: $(CONTROLLER_GEN) ## Download controller-gen locally if necessar
 $(CONTROLLER_GEN): $(LOCALBIN)
 	test -s $(LOCALBIN)/controller-gen || GOBIN=$(LOCALBIN) go install sigs.k8s.io/controller-tools/cmd/controller-gen@$(CONTROLLER_TOOLS_VERSION)
 
-.PHONY: kernel
-kernel: ## Build linux kernel.
-	rm -f hack/vmlinuz
-	docker buildx build \
-		--build-arg KERNEL_VERSION=$(VM_KERNEL_VERSION) \
-		--output type=local,dest=hack/ \
-		--platform linux/amd64 \
-		--pull \
-		--no-cache \
-		--file hack/Dockerfile.kernel-builder .
 
 .PHONY: cert-manager
 cert-manager: ## install cert-manager to cluster
 	kubectl apply -f https://github.com/cert-manager/cert-manager/releases/latest/download/cert-manager.yaml
-
-.PHONY: kind-load
-kind-load: docker-build  ## Push docker images to the kind cluster.
-	kind load docker-image $(IMG)
-	kind load docker-image $(IMG_RUNNER)
-	kind load docker-image $(VM_EXAMPLE_IMAGE)
-	kind load docker-image $(VXLAN_IMAGE)
 

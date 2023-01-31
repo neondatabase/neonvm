@@ -24,6 +24,7 @@ spec:
         app.kubernetes.io/component: vxlan-controller
     spec:
       hostNetwork: true
+      dnsPolicy: ClusterFirstWithHostNet
       serviceAccount: vxlan-controller
       serviceAccountName: vxlan-controller
       terminationGracePeriodSeconds: 10

@@ -228,8 +228,7 @@ type ExtraNetwork struct {
 	// +kubebuilder:default:=net1
 	Interface string `json:"interface"`
 	// Multus Network name specified in network-attachments-definition.
-	MultusNetwork   string `json:"multusNetwork"`
-	MultusNetworkL2 string `json:"multusNetworkL2"`
+	MultusNetwork string `json:"multusNetwork"`
 }
 
 // VirtualMachineStatus defines the observed state of VirtualMachine

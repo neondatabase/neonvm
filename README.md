@@ -81,29 +81,16 @@ kubectl delete neonvm vm-debian
 #### 1. Create local cluster (with 3 nodes)
 
 ```sh
-cat | kind create cluster --image kindest/node:v1.23.13 --config - <<EOF
-kind: Cluster
-apiVersion: kind.x-k8s.io/v1alpha4
-nodes:
-- role: control-plane
-- role: worker
-- role: worker
-EOF
+make local-cluster
 ```
 
-#### 2. Install cert-manager
-
-```sh
-make cert-manager
-```
-
-#### 3. Build Linux kernel for Guests
+#### 2. Build Linux kernel for Guests
 
 ```sh
 make kernel
 ```
 
-#### 4. Build and deploy controller  to local cluster
+#### 3. Build and deploy controller  to local cluster
 
 ```sh
 make deploy
