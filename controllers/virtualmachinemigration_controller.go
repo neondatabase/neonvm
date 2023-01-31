@@ -543,11 +543,6 @@ func (r *VirtualMachineMigrationReconciler) targetPodForVirtualMachine(
 		})
 	}
 
-	// use L2 multus netwoork (without IPAM)
-	if virtualmachine.Spec.ExtraNetwork != nil {
-		pod.Annotations["k8s.v1.cni.cncf.io/networks"] = fmt.Sprintf("%s@%s", virtualmachine.Spec.ExtraNetwork.MultusNetworkL2, virtualmachine.Spec.ExtraNetwork.Interface)
-	}
-
 	// Set the ownerRef for the Pod
 	if err := ctrl.SetControllerReference(virtualmachinemigration, pod, r.Scheme); err != nil {
 		return nil, err

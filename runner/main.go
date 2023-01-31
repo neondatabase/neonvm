@@ -504,18 +504,14 @@ func main() {
 
 	// overlay (multus) net details
 	if vmSpec.ExtraNetwork != nil {
+		macOverlay, err := overlayNetwork(vmSpec.ExtraNetwork.Interface)
+		if err != nil {
+			log.Fatalf("can not setup overlay network: %s", err)
+		}
 		if os.Getenv("RECEIVE_MIGRATION") == "true" {
-			_, err := overlayNetwork(defaultNetworkCIDR, vmSpec.ExtraNetwork.Interface, true)
-			if err != nil {
-				log.Fatalf("can not setup overlay network: %s", err)
-			}
 			qemuCmd = append(qemuCmd, "-netdev", fmt.Sprintf("tap,id=overlay,ifname=%s,script=no,downscript=no,vhost=on", overlayNetworkTapName))
 			qemuCmd = append(qemuCmd, "-device", fmt.Sprintf("virtio-net-pci,netdev=overlay"))
 		} else {
-			macOverlay, err := overlayNetwork(defaultNetworkCIDR, vmSpec.ExtraNetwork.Interface, false)
-			if err != nil {
-				log.Fatalf("can not setup overlay network: %s", err)
-			}
 			qemuCmd = append(qemuCmd, "-netdev", fmt.Sprintf("tap,id=overlay,ifname=%s,script=no,downscript=no,vhost=on", overlayNetworkTapName))
 			qemuCmd = append(qemuCmd, "-device", fmt.Sprintf("virtio-net-pci,netdev=overlay,mac=%s", macOverlay.String()))
 		}
@@ -671,7 +667,7 @@ func defaultNetwork(cidr string, ports []vmv1.Port) (mac.MAC, error) {
 	return mac, nil
 }
 
-func overlayNetwork(cidr string, iface string, skipIpSetup bool) (mac.MAC, error) {
+func overlayNetwork(iface string) (mac.MAC, error) {
 	// gerenare random MAC for overlay Guest interface
 	mac, err := mac.GenerateRandMAC()
 	if err != nil {
@@ -688,19 +684,6 @@ func overlayNetwork(cidr string, iface string, skipIpSetup bool) (mac.MAC, error
 		},
 	}
 	if err := netlink.LinkAdd(bridge); err != nil {
-		return nil, err
-	}
-	ipBrige, _, mask, err := calcIPs(cidr)
-	if err != nil {
-		return nil, err
-	}
-	bridgeAddr := &netlink.Addr{
-		IPNet: &net.IPNet{
-			IP:   ipBrige,
-			Mask: mask,
-		},
-	}
-	if err := netlink.AddrAdd(bridge, bridgeAddr); err != nil {
 		return nil, err
 	}
 	if err := netlink.LinkSetUp(bridge); err != nil {
@@ -732,39 +715,6 @@ func overlayNetwork(cidr string, iface string, skipIpSetup bool) (mac.MAC, error
 	}
 	if err := netlink.LinkSetMaster(overlayLink, bridge); err != nil {
 		return nil, err
-	}
-
-	if !skipIpSetup {
-		// remove IP address from overlay interface and use it in dnsmasq
-		overlayAddrs, err := netlink.AddrList(overlayLink, netlink.FAMILY_V4)
-		if err != nil {
-			return nil, err
-		}
-		if len(overlayAddrs) == 0 {
-			return nil, fmt.Errorf("IP address info not found in %s interface", iface)
-		}
-		log.Printf("DEGUG %s address details %v", iface, overlayAddrs)
-		overlayAddr := overlayAddrs[0]
-		overlayIP := overlayAddr.IP
-		overlayMask := overlayAddr.Mask
-		if err := netlink.AddrDel(overlayLink, &overlayAddr); err != nil {
-			return nil, err
-		}
-
-		// prepare dnsmask command line (instead of config file)
-		dnsMaskCmd := []string{
-			"--port=0",
-			"--bind-interfaces",
-			"--dhcp-authoritative",
-			fmt.Sprintf("--interface=%s", overlayNetworkBridgeName),
-			fmt.Sprintf("--dhcp-range=%s,static,%d.%d.%d.%d", overlayIP.String(), overlayMask[0], overlayMask[1], overlayMask[2], overlayMask[3]),
-			fmt.Sprintf("--dhcp-host=%s,%s,infinite", mac.String(), overlayIP.String()),
-			fmt.Sprintf("--shared-network=%s,%s", overlayNetworkBridgeName, overlayIP.String()),
-		}
-		// run dnsmasq for default Guest interface
-		if err := execFg("dnsmasq", dnsMaskCmd...); err != nil {
-			return nil, err
-		}
 	}
 
 	return mac, nil
