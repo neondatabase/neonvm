@@ -53,6 +53,9 @@ spec:
           value: "vxlan-ipam"
         - name: GOIPAM_LOG_LEVEL
           value: "debug"
+        envFrom:
+        - configMapRef:
+            name: vxlan-ipam
         ports:
         - containerPort: 9090
           name: grpc

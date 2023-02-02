@@ -13,6 +13,7 @@ namePrefix: neonvm-
 #  someName: someValue
 
 bases:
+- ../namespace
 - ../crd
 - ../rbac
 - ../controller

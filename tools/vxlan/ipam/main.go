@@ -23,6 +23,7 @@ import (
 	"golang.org/x/net/http2/h2c"
 
 	goipam "github.com/cicdteam/go-ipam"
+	goipamapiv1 "github.com/cicdteam/go-ipam/api/v1"
 	"github.com/cicdteam/go-ipam/api/v1/apiv1connect"
 	"github.com/cicdteam/go-ipam/pkg/service"
 )
@@ -38,6 +39,12 @@ func main() {
 				Value:   ":9090",
 				Usage:   "gRPC server endpoint",
 				EnvVars: []string{"GOIPAM_GRPC_SERVER_ENDPOINT"},
+			},
+			&cli.StringFlag{
+				Name:    "cidr",
+				Value:   "10.10.10.0/24",
+				Usage:   "CIDR for IP address management",
+				EnvVars: []string{"GOIPAM_CIDR"},
 			},
 			&cli.StringFlag{
 				Name:    "log-level",
@@ -81,6 +88,7 @@ type config struct {
 	Storage            goipam.Storage
 	ConfigMapName      string
 	ConfigMapCache     bool
+	Cidr               string
 }
 
 func getConfig(ctx *cli.Context) config {
@@ -98,6 +106,7 @@ func getConfig(ctx *cli.Context) config {
 
 	return config{
 		GrpcServerEndpoint: ctx.String("grpc-server-endpoint"),
+		Cidr:               ctx.String("cidr"),
 		Log:                zlog.Sugar(),
 		ConfigMapName:      ctx.String("configmap"),
 		ConfigMapCache:     ctx.Bool("cache"),
@@ -121,7 +130,7 @@ func newServer(c config) *server {
 	}
 }
 func (s *server) Run() error {
-	s.log.Infow("starting vxlan ipam server", "backend", s.storage.Name(), "configmap name", s.c.ConfigMapName, "configmap cache", s.c.ConfigMapCache, "endpoint", s.c.GrpcServerEndpoint)
+	s.log.Infow("starting vxlan ipam server", "cidr", s.c.Cidr, "backend", s.storage.Name(), "configmap name", s.c.ConfigMapName, "configmap cache", s.c.ConfigMapCache, "endpoint", s.c.GrpcServerEndpoint)
 	mux := http.NewServeMux()
 
 	compress1KB := connect.WithCompressMinBytes(1024)
@@ -166,6 +175,34 @@ func (s *server) Run() error {
 		return nil
 	}()
 
+	s.log.Infow("creating prefix", "cidr", s.c.Cidr)
+	c := apiv1connect.NewIpamServiceClient(
+		http.DefaultClient,
+		"http://"+s.c.GrpcServerEndpoint,
+		connect.WithGRPC(),
+	)
+
+	prefixes, err := c.ListPrefixes(context.Background(), connect.NewRequest(&goipamapiv1.ListPrefixesRequest{}))
+	if err != nil {
+		return err
+	}
+
+	prefixAlreadyCreated := false
+	for _, p := range prefixes.Msg.Prefixes {
+		if p.Cidr == s.c.Cidr {
+			prefixAlreadyCreated = true
+			s.log.Infow("prefix already present, skip prefix creation", "cidr", p.Cidr)
+		}
+	}
+
+	if !prefixAlreadyCreated {
+		result, err := c.CreatePrefix(context.Background(), connect.NewRequest(&goipamapiv1.CreatePrefixRequest{Cidr: s.c.Cidr}))
+		if err != nil {
+			return err
+		}
+		s.log.Infow("prefix created", "cidr", result.Msg.Prefix.Cidr)
+	}
+
 	<-signals
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
@@ -175,10 +212,4 @@ func (s *server) Run() error {
 	}
 
 	return nil
-
-	/*
-		err := server.ListenAndServe()
-		return err
-	*/
-
 }

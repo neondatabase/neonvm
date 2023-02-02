@@ -3,15 +3,15 @@ kind: Kustomization
 
 configMapGenerator:
 - literals:
-  - OVERLAY_CIDR=10.77.0.0/20
-  - IPAM_SERVER=http://vxlan-ipam:9090
-  name: vxlan-controller
+  - GOIPAM_CIDR=10.77.0.0/20
+  name: vxlan-ipam
   namespace: neonvm-system
 
 generatorOptions:
  disableNameSuffixHash: true
 
 bases:
+- ../namespace
 - vxlan-ipam
 - vxlan-controller
 - https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/v3.9.3/deployments/multus-daemonset-thick-plugin.yml

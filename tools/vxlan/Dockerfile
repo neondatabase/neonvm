@@ -31,6 +31,13 @@ RUN apk add --no-cache \
     iptables \
     iproute2
 
+# add CNI plugins
+RUN set -e \
+    && wget -q https://github.com/containernetworking/plugins/releases/download/v1.2.0/cni-plugins-linux-amd64-v1.2.0.tgz -O cni.tgz \
+    && mkdir -p /opt/cni/bin \
+    && tar -xzf cni.tgz -C /opt/cni/bin \
+    && rm -f cni.tgz
+
 RUN set -e \
     && wget -q https://github.com/grpc-ecosystem/grpc-health-probe/releases/latest/download/grpc_health_probe-linux-amd64 -O /usr/bin/grpc_health_probe \
     && chmod +x /usr/bin/grpc_health_probe

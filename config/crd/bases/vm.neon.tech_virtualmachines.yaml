@@ -25,6 +25,9 @@ spec:
     - jsonPath: .status.podName
       name: Pod
       type: string
+    - jsonPath: .status.extraNetIP
+      name: ExtraIP
+      type: string
     - jsonPath: .status.phase
       name: Status
       type: string
@@ -1387,6 +1390,10 @@ spec:
                 type: array
               cpus:
                 type: integer
+              extraNetIP:
+                type: string
+              extraNetMask:
+                type: string
               memorySize:
                 anyOf:
                 - type: integer

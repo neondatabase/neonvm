@@ -4,6 +4,7 @@ go 1.19
 
 require (
 	github.com/alessio/shellescape v1.4.1
+	github.com/bufbuild/connect-go v1.4.1
 	github.com/bufbuild/connect-grpchealth-go v1.0.0
 	github.com/bufbuild/connect-grpcreflect-go v1.0.0
 	github.com/cicdteam/go-ipam v0.2.0
@@ -12,13 +13,13 @@ require (
 	github.com/docker/docker v20.10.22+incompatible
 	github.com/docker/libnetwork v0.8.0-dev.2.0.20210525090646-64b7a4574d14
 	github.com/kdomanski/iso9660 v0.3.3
-	github.com/klauspost/connect-compress v1.0.0
 	github.com/onsi/ginkgo/v2 v2.1.6
 	github.com/onsi/gomega v1.20.1
 	github.com/urfave/cli/v2 v2.24.2
 	github.com/vishvananda/netlink v1.1.1-0.20220125195016-0639e7e787ba
 	go.uber.org/zap v1.24.0
 	golang.org/x/net v0.5.0
+	google.golang.org/grpc v1.51.0
 	k8s.io/api v0.23.10
 	k8s.io/apimachinery v0.23.10
 	k8s.io/apiserver v0.23.10
@@ -39,7 +40,6 @@ require (
 	github.com/Microsoft/go-winio v0.6.0 // indirect
 	github.com/avast/retry-go/v4 v4.3.2 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
-	github.com/bufbuild/connect-go v1.4.1 // indirect
 	github.com/cespare/xxhash/v2 v2.2.0 // indirect
 	github.com/coreos/go-semver v0.3.0 // indirect
 	github.com/coreos/go-systemd/v22 v22.5.0 // indirect
@@ -116,7 +116,6 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
 	google.golang.org/genproto v0.0.0-20230106154932-a12b697841d9 // indirect
-	google.golang.org/grpc v1.51.0 // indirect
 	google.golang.org/protobuf v1.28.1 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

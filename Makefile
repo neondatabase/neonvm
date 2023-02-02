@@ -149,10 +149,6 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 DEPLOYTS := $(shell date +%s)
 .PHONY: deploy
 deploy: kind-load manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/controller && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build config/default | kubectl apply -f -
-	kubectl -n neonvm-system rollout restart deployment neonvm-controller
-	kubectl -n neonvm-system rollout status  deployment neonvm-controller
 	cd config/overlay_network/vxlan-controller && $(KUSTOMIZE) edit set image vxlan-controller=$(VXLAN_IMAGE)
 	cd config/overlay_network/vxlan-ipam       && $(KUSTOMIZE) edit set image vxlan-controller=$(VXLAN_IMAGE)
 	$(KUSTOMIZE) build config/overlay_network | kubectl apply -f -
@@ -162,6 +158,10 @@ deploy: kind-load manifests kustomize ## Deploy controller to the K8s cluster sp
 	kubectl -n neonvm-system rollout status  daemonset vxlan-controller
 	kubectl -n kube-system   rollout status  daemonset kube-multus-ds
 	$(KUSTOMIZE) build config/overlay_network/network | kubectl apply -f -
+	cd config/controller && $(KUSTOMIZE) edit set image controller=$(IMG)
+	$(KUSTOMIZE) build config/default | kubectl apply -f -
+	kubectl -n neonvm-system rollout restart deployment neonvm-controller
+	kubectl -n neonvm-system rollout status  deployment neonvm-controller
 
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.

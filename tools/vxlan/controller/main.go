@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"net"
 	"net/http"
@@ -30,8 +31,7 @@ const (
 	VXLAN_BRIDGE_NAME = "neon-br0"
 	VXLAN_ID          = 100
 
-	overlayCidrVariableName = "OVERLAY_CIDR"
-	ipamServerVariableName  = "IPAM_SERVER"
+	ipamServerVariableName = "IPAM_SERVER"
 )
 
 var (
@@ -41,10 +41,6 @@ var (
 func main() {
 	flag.Parse()
 
-	overlayNet := os.Getenv(overlayCidrVariableName)
-	if len(overlayNet) == 0 {
-		log.Fatalf("Overlay network CIDR not found, environment variable %s is empty", overlayCidrVariableName)
-	}
 	ipamService := os.Getenv(ipamServerVariableName)
 	if len(ipamService) == 0 {
 		log.Fatalf("IPAM service not found, environment variable %s is empty", ipamServerVariableName)
@@ -64,19 +60,12 @@ func main() {
 
 	// -delete option used for teardown vxlan setup
 	if *delete {
-		/*
-			// delete routes
-			log.Printf("deleting route to overlay network '%s'", overlayNet)
-			if err := routeDel(overlayNet, VXLAN_BRIDGE_NAME); err != nil {
-				log.Print(err)
-			}
-		*/
 		log.Printf("deleting vxlan interface %s", VXLAN_IF_NAME)
 		if err := deleteLink(VXLAN_IF_NAME); err != nil {
 			log.Print(err)
 		}
 		log.Printf("deleting bridge interface %s", VXLAN_BRIDGE_NAME)
-		if err := deleteLinkAndAddr(VXLAN_BRIDGE_NAME, overlayNet, ipamService); err != nil {
+		if err := deleteLinkAndAddr(VXLAN_BRIDGE_NAME, ipamService); err != nil {
 			log.Print(err)
 		}
 		os.Exit(0)
@@ -87,7 +76,7 @@ func main() {
 
 	// create linux bridge
 	log.Printf("creating linux bridge interface (name: %s)", VXLAN_BRIDGE_NAME)
-	if err := createBrigeInterface(VXLAN_BRIDGE_NAME, overlayNet, ipamService); err != nil {
+	if err := createBrigeInterface(VXLAN_BRIDGE_NAME, ipamService); err != nil {
 		log.Fatal(err)
 	}
 
@@ -111,14 +100,6 @@ func main() {
 			log.Fatal(err)
 		}
 
-		/*
-			// update routes
-			log.Printf("upsert route to overlay network '%s' via '%s'", overlayNet, VXLAN_BRIDGE_NAME)
-			if err := routeAdd(overlayNet, VXLAN_BRIDGE_NAME); err != nil {
-				log.Fatal(err)
-			}
-		*/
-
 		time.Sleep(30 * time.Second)
 	}
 }
@@ -139,7 +120,7 @@ func getNodesIPs(clientset *kubernetes.Clientset) ([]string, error) {
 	return ips, nil
 }
 
-func createBrigeInterface(name, overlay, ipam string) error {
+func createBrigeInterface(name, ipam string) error {
 	// check if interface already exists
 	l, err := netlink.LinkByName(name)
 	if err == nil {
@@ -147,7 +128,7 @@ func createBrigeInterface(name, overlay, ipam string) error {
 		ips, _ := netlink.AddrList(l, netlink.FAMILY_V4)
 		if len(ips) == 0 {
 			log.Printf("no ip address found in %s", name)
-			ip, mask, err := acquireIP(ipam, overlay)
+			ip, mask, err := acquireIP(ipam)
 			if err != nil {
 				return err
 			}
@@ -183,7 +164,7 @@ func createBrigeInterface(name, overlay, ipam string) error {
 		return err
 	}
 
-	ip, mask, err := acquireIP(ipam, overlay)
+	ip, mask, err := acquireIP(ipam)
 	if err != nil {
 		return err
 	}
@@ -275,58 +256,6 @@ func updateFDB(vxlanName string, nodeIPs []string, ownIP string) error {
 	return nil
 }
 
-/*
-func routeAdd(cidr string, iface string) error {
-	// get interface details
-	link, err := netlink.LinkByName(iface)
-	if err != nil {
-		return err
-	}
-
-	// parse CIDR the retrive network
-	_, ipv4Net, err := net.ParseCIDR(cidr)
-	if err != nil {
-		return err
-	}
-
-	// add/replace route
-	route := netlink.Route{
-		LinkIndex: link.Attrs().Index,
-		Dst:       ipv4Net,
-	}
-	if netlink.RouteReplace(&route); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func routeDel(cidr string, iface string) error {
-	// get interface details
-	link, err := netlink.LinkByName(iface)
-	if err != nil {
-		return err
-	}
-
-	// parse CIDR the retrive network
-	_, ipv4Net, err := net.ParseCIDR(cidr)
-	if err != nil {
-		return err
-	}
-
-	// del route
-	route := netlink.Route{
-		LinkIndex: link.Attrs().Index,
-		Dst:       ipv4Net,
-	}
-	if netlink.RouteDel(&route); err != nil {
-		return err
-	}
-
-	return nil
-}
-*/
-
 func deleteLink(name string) error {
 	// check if interface already exists
 	link, err := netlink.LinkByName(name)
@@ -346,14 +275,14 @@ func deleteLink(name string) error {
 	return nil
 }
 
-func deleteLinkAndAddr(name, overlay, ipam string) error {
+func deleteLinkAndAddr(name, ipam string) error {
 	// check if interface already exists
 	link, lerr := netlink.LinkByName(name)
 	if lerr == nil {
 		ips, _ := netlink.AddrList(link, netlink.FAMILY_V4)
 		for _, ip := range ips {
 			log.Printf("releasing ip %s", ip.IP.String())
-			if err := releaseIP(ipam, overlay, ip.IP); err != nil {
+			if err := releaseIP(ipam, ip.IP); err != nil {
 				log.Println(err)
 			}
 		}
@@ -397,7 +326,7 @@ func waitForGrpc(ctx context.Context, addr string) {
 	}
 }
 
-func acquireIP(ipam, overlay string) (net.IP, net.IPMask, error) {
+func acquireIP(ipam string) (net.IP, net.IPMask, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -414,32 +343,22 @@ func acquireIP(ipam, overlay string) (net.IP, net.IPMask, error) {
 	if err != nil {
 		return net.IP{}, net.IPMask{}, err
 	}
-
-	// check if overlay cidr already created as prefix in IPAM service
-	prefixAlreadyCreated := false
-	for _, p := range prefixes.Msg.Prefixes {
-		if p.Cidr == overlay {
-			prefixAlreadyCreated = true
-			log.Printf("prefix %s already present, skip prefix creation", p.Cidr)
-		}
+	p := prefixes.Msg.Prefixes
+	if len(p) == 0 {
+		return net.IP{}, net.IPMask{}, fmt.Errorf("IPAM prefix not found")
+	}
+	if len(p) > 1 {
+		return net.IP{}, net.IPMask{}, fmt.Errorf("too many IPAM prefixes found (%d)", len(p))
 	}
 
-	if !prefixAlreadyCreated {
-		result, err := c.CreatePrefix(ctx, connect.NewRequest(&goipamapiv1.CreatePrefixRequest{Cidr: overlay}))
-		if err != nil {
-			return net.IP{}, net.IPMask{}, err
-		}
-		log.Printf("prefix %s created", result.Msg.Prefix.Cidr)
-	}
-
-	result, err := c.AcquireIP(ctx, connect.NewRequest(&goipamapiv1.AcquireIPRequest{PrefixCidr: overlay}))
+	result, err := c.AcquireIP(ctx, connect.NewRequest(&goipamapiv1.AcquireIPRequest{PrefixCidr: p[0].Cidr}))
 	if err != nil {
 		return net.IP{}, net.IPMask{}, err
 	}
 	log.Printf("ip %s acquired", result.Msg.Ip.Ip)
 
 	// parse overlay cidr for IPMask
-	_, ipv4Net, err := net.ParseCIDR(overlay)
+	_, ipv4Net, err := net.ParseCIDR(p[0].Cidr)
 	if err != nil {
 		return net.IP{}, net.IPMask{}, err
 	}
@@ -449,7 +368,7 @@ func acquireIP(ipam, overlay string) (net.IP, net.IPMask, error) {
 	return ip, mask, nil
 }
 
-func releaseIP(ipam, overlay string, ip net.IP) error {
+func releaseIP(ipam string, ip net.IP) error {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -461,7 +380,20 @@ func releaseIP(ipam, overlay string, ip net.IP) error {
 		connect.WithGRPC(),
 	)
 
-	result, err := c.ReleaseIP(ctx, connect.NewRequest(&goipamapiv1.ReleaseIPRequest{PrefixCidr: overlay, Ip: ip.String()}))
+	// get prefixes from IPAM service
+	prefixes, err := c.ListPrefixes(ctx, connect.NewRequest(&goipamapiv1.ListPrefixesRequest{}))
+	if err != nil {
+		return err
+	}
+	p := prefixes.Msg.Prefixes
+	if len(p) == 0 {
+		return fmt.Errorf("IPAM prefix not found")
+	}
+	if len(p) > 1 {
+		return fmt.Errorf("too many IPAM prefixes found (%d)", len(p))
+	}
+
+	result, err := c.ReleaseIP(ctx, connect.NewRequest(&goipamapiv1.ReleaseIPRequest{PrefixCidr: p[0].Cidr, Ip: ip.String()}))
 	if err != nil {
 		return err
 	}

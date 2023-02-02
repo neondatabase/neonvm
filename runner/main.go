@@ -387,17 +387,27 @@ func checkKVM() bool {
 
 func main() {
 	var vmSpecDump string
-	flag.StringVar(&vmSpecDump, "vmdump", vmSpecDump, "Base64 encoded VirtualMachine json specification")
+	var vmStatusDump string
+	flag.StringVar(&vmSpecDump, "vmspec", vmSpecDump, "Base64 encoded VirtualMachine json specification")
+	flag.StringVar(&vmStatusDump, "vmstatus", vmStatusDump, "Base64 encoded VirtualMachine json status")
 	flag.Parse()
 
 	vmSpecJson, err := base64.StdEncoding.DecodeString(vmSpecDump)
 	if err != nil {
-		log.Fatalf("Failed to decode VirtualMachine dump: %s", err)
+		log.Fatalf("Failed to decode VirtualMachine Spec dump: %s", err)
+	}
+	vmStatusJson, err := base64.StdEncoding.DecodeString(vmStatusDump)
+	if err != nil {
+		log.Fatalf("Failed to decode VirtualMachine Status dump: %s", err)
 	}
 
 	vmSpec := &vmv1.VirtualMachineSpec{}
 	if err := json.Unmarshal(vmSpecJson, vmSpec); err != nil {
-		log.Fatalf("Failed to unmarshal VM: %s", err)
+		log.Fatalf("Failed to unmarshal VM Spec: %s", err)
+	}
+	vmStatus := &vmv1.VirtualMachineStatus{}
+	if err := json.Unmarshal(vmStatusJson, vmStatus); err != nil {
+		log.Fatalf("Failed to unmarshal VM Status: %s", err)
 	}
 
 	cpus := []string{}
@@ -506,18 +516,13 @@ func main() {
 	qemuCmd = append(qemuCmd, "-device", fmt.Sprintf("virtio-net-pci,netdev=default,mac=%s", macDefault.String()))
 
 	// overlay (multus) net details
-	if vmSpec.ExtraNetwork != nil {
-		macOverlay, err := overlayNetwork(vmSpec.ExtraNetwork.Interface)
+	if len(vmStatus.ExtraNetIP) != 0 {
+		macOverlay, err := overlayNetwork(vmSpec.ExtraNetwork.Interface, vmStatus.ExtraNetIP, vmStatus.ExtraNetMask)
 		if err != nil {
 			log.Fatalf("can not setup overlay network: %s", err)
 		}
-		if os.Getenv("RECEIVE_MIGRATION") == "true" {
-			qemuCmd = append(qemuCmd, "-netdev", fmt.Sprintf("tap,id=overlay,ifname=%s,script=no,downscript=no,vhost=on", overlayNetworkTapName))
-			qemuCmd = append(qemuCmd, "-device", fmt.Sprintf("virtio-net-pci,netdev=overlay"))
-		} else {
-			qemuCmd = append(qemuCmd, "-netdev", fmt.Sprintf("tap,id=overlay,ifname=%s,script=no,downscript=no,vhost=on", overlayNetworkTapName))
-			qemuCmd = append(qemuCmd, "-device", fmt.Sprintf("virtio-net-pci,netdev=overlay,mac=%s", macOverlay.String()))
-		}
+		qemuCmd = append(qemuCmd, "-netdev", fmt.Sprintf("tap,id=overlay,ifname=%s,script=no,downscript=no,vhost=on", overlayNetworkTapName))
+		qemuCmd = append(qemuCmd, "-device", fmt.Sprintf("virtio-net-pci,netdev=overlay,mac=%s", macOverlay.String()))
 	}
 
 	// should runner receive migration ?
@@ -670,7 +675,7 @@ func defaultNetwork(cidr string, ports []vmv1.Port) (mac.MAC, error) {
 	return mac, nil
 }
 
-func overlayNetwork(iface string) (mac.MAC, error) {
+func overlayNetwork(iface, ip, mask string) (mac.MAC, error) {
 	// gerenare random MAC for overlay Guest interface
 	mac, err := mac.GenerateRandMAC()
 	if err != nil {
@@ -687,6 +692,19 @@ func overlayNetwork(iface string) (mac.MAC, error) {
 		},
 	}
 	if err := netlink.LinkAdd(bridge); err != nil {
+		return nil, err
+	}
+	ipBrige, _, maskBridge, err := calcIPs(overlayNetworkCIDR)
+	if err != nil {
+		return nil, err
+	}
+	bridgeAddr := &netlink.Addr{
+		IPNet: &net.IPNet{
+			IP:   ipBrige,
+			Mask: maskBridge,
+		},
+	}
+	if err := netlink.AddrAdd(bridge, bridgeAddr); err != nil {
 		return nil, err
 	}
 	if err := netlink.LinkSetUp(bridge); err != nil {
@@ -717,6 +735,21 @@ func overlayNetwork(iface string) (mac.MAC, error) {
 		return nil, err
 	}
 	if err := netlink.LinkSetMaster(overlayLink, bridge); err != nil {
+		return nil, err
+	}
+
+	// prepare dnsmask command line (instead of config file)
+	dnsMaskCmd := []string{
+		"--port=0",
+		"--bind-interfaces",
+		"--dhcp-authoritative",
+		fmt.Sprintf("--interface=%s", overlayNetworkBridgeName),
+		fmt.Sprintf("--dhcp-range=%s,static,%s", ip, mask),
+		fmt.Sprintf("--dhcp-host=%s,%s,infinite", mac.String(), ip),
+		fmt.Sprintf("--shared-network=%s,%s", overlayNetworkBridgeName, ip),
+	}
+	// run dnsmasq for default Guest interface
+	if err := execFg("dnsmasq", dnsMaskCmd...); err != nil {
 		return nil, err
 	}
 
