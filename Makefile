@@ -62,7 +62,7 @@ generate: ## Generate boilerplate DeepCopy methods, manifests, and Go client
 
 .PHONY: manifests
 manifests: controller-gen ## Generate WebhookConfiguration, ClusterRole and CustomResourceDefinition objects.
-	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/crd/bases
+	$(CONTROLLER_GEN) rbac:roleName=manager-role crd webhook paths="./..." output:crd:artifacts:config=config/common/crd/bases output:rbac:artifacts:config=config/common/rbac output:webhook:artifacts:config=config/common/webhook
 
 .PHONY: fmt
 fmt: ## Run go fmt against code.
@@ -149,24 +149,33 @@ uninstall: manifests kustomize ## Uninstall CRDs from the K8s cluster specified 
 DEPLOYTS := $(shell date +%s)
 .PHONY: deploy
 deploy: kind-load manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
-	cd config/overlay_network/vxlan-controller && $(KUSTOMIZE) edit set image vxlan-controller=$(VXLAN_IMAGE)
-	cd config/overlay_network/vxlan-ipam       && $(KUSTOMIZE) edit set image vxlan-controller=$(VXLAN_IMAGE)
-	$(KUSTOMIZE) build config/overlay_network | kubectl apply -f -
-	kubectl -n neonvm-system rollout restart deployment vxlan-ipam
-	kubectl -n neonvm-system rollout status  deployment vxlan-ipam
-	kubectl -n neonvm-system rollout restart daemonset vxlan-controller
-	kubectl -n neonvm-system rollout status  daemonset vxlan-controller
-	kubectl -n kube-system   rollout status  daemonset kube-multus-ds
-	$(KUSTOMIZE) build config/overlay_network/network | kubectl apply -f -
-	cd config/controller && $(KUSTOMIZE) edit set image controller=$(IMG)
-	$(KUSTOMIZE) build config/default | kubectl apply -f -
-	kubectl -n neonvm-system rollout restart deployment neonvm-controller
+	cd config/common/controller              && $(KUSTOMIZE) edit set image controller=$(IMG)               && $(KUSTOMIZE) edit add annotation deploytime:$(DEPLOYTS) --force
+	cd config/default-vxlan/vxlan-controller && $(KUSTOMIZE) edit set image vxlan-controller=$(VXLAN_IMAGE) && $(KUSTOMIZE) edit add annotation deploytime:$(DEPLOYTS) --force
+	cd config/default-vxlan/vxlan-ipam       && $(KUSTOMIZE) edit set image vxlan-controller=$(VXLAN_IMAGE) && $(KUSTOMIZE) edit add annotation deploytime:$(DEPLOYTS) --force
+	$(KUSTOMIZE) build config/default-vxlan/multus > neonvm-multus.yaml
+	$(KUSTOMIZE) build config/default-vxlan > neonvm-vxlan.yaml
+	cd config/common/controller              && $(KUSTOMIZE) edit remove annotation deploytime
+	cd config/default-vxlan/vxlan-controller && $(KUSTOMIZE) edit remove annotation deploytime
+	cd config/default-vxlan/vxlan-ipam       && $(KUSTOMIZE) edit remove annotation deploytime
+	kubectl apply -f neonvm-multus.yaml
+	kubectl -n kube-system rollout status daemonset kube-multus-ds
+	kubectl apply -f neonvm-vxlan.yaml
+	kubectl -n neonvm-system rollout status  deployment neonvm-vxlan-ipam
+	kubectl -n neonvm-system rollout status  daemonset  neonvm-vxlan-controller
 	kubectl -n neonvm-system rollout status  deployment neonvm-controller
+
+.PHONY: deploy-controller
+deploy-controller: kind-load manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
+	cd config/common/controller && $(KUSTOMIZE) edit set image controller=$(IMG) && $(KUSTOMIZE) edit add annotation deploytime:$(DEPLOYTS) --force
+	$(KUSTOMIZE) build config/default > neonvm.yaml
+	cd config/common/controller && $(KUSTOMIZE) edit remove annotation deploytime
+	kubectl apply -f neonvm.yaml
+	kubectl -n neonvm-system rollout status deployment neonvm-controller
 
 .PHONY: undeploy
 undeploy: ## Undeploy controller from the K8s cluster specified in ~/.kube/config. Call with ignore-not-found=true to ignore resource not found errors during deletion.
-	$(KUSTOMIZE) build config/default | kubectl delete --ignore-not-found=$(ignore-not-found) -f - || true
-	$(KUSTOMIZE) build config/overlay_network | kubectl delete --ignore-not-found=$(ignore-not-found) -f - || true
+	$(KUSTOMIZE) build config/default-vxlan | kubectl delete --ignore-not-found=$(ignore-not-found) -f - || true
+	$(KUSTOMIZE) build config/default-vxlan/multus | kubectl delete --ignore-not-found=$(ignore-not-found) -f - || true
 
 ##@ Local cluster
 

@@ -60,9 +60,6 @@ spec:
         - --leader-elect
         image: controller:dev
         name: manager
-        env:
-          - name: IPAM_SERVER
-            value: "http://vxlan-ipam:9090"
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:

@@ -48,11 +48,6 @@ spec:
         image: vxlan-controller:dev
         imagePullPolicy: IfNotPresent
         args: ["vxlan-ipam"]
-        env:
-        - name: GOIPAM_CONFIGMAP_NAME
-          value: "vxlan-ipam"
-        - name: GOIPAM_LOG_LEVEL
-          value: "debug"
         envFrom:
         - configMapRef:
             name: vxlan-ipam

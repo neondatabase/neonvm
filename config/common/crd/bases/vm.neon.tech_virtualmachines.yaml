@@ -1078,16 +1078,18 @@ spec:
                 description: Extra network interface attached to network provided
                   by Mutlus CNI.
                 properties:
+                  enable:
+                    default: false
+                    description: Enable extra netowrk interface
+                    type: boolean
                   interface:
                     default: net1
                     description: Interface name.
                     type: string
                   multusNetwork:
+                    default: neonvm-system/neonvm-overlay-net
                     description: Multus Network name specified in network-attachments-definition.
                     type: string
-                required:
-                - interface
-                - multusNetwork
                 type: object
               guest:
                 properties:
@@ -1315,6 +1317,7 @@ spec:
                   type: object
                 type: array
             required:
+            - extraNetwork
             - guest
             type: object
           status:

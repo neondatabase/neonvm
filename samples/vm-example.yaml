@@ -64,8 +64,7 @@ spec:
       - name: metrics
         port: 9187
   extraNetwork:
-      interface: net1
-      multusNetwork: neonvm-system/overlay
+      enable: true
   disks:
     - name: pgdata
       mountPath: /var/lib/postgresql

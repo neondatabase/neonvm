@@ -64,8 +64,7 @@ type VirtualMachineSpec struct {
 	Disks []Disk `json:"disks,omitempty"`
 
 	// Extra network interface attached to network provided by Mutlus CNI.
-	// +optional
-	ExtraNetwork *ExtraNetwork `json:"extraNetwork,omitempty"`
+	ExtraNetwork *ExtraNetwork `json:"extraNetwork"`
 }
 
 // +kubebuilder:validation:Enum=Always;OnFailure;Never
@@ -224,10 +223,17 @@ type TmpfsDiskSource struct {
 }
 
 type ExtraNetwork struct {
+	// Enable extra netowrk interface
+	// +kubebuilder:default:=false
+	// +optional
+	Enable bool `json:"enable"`
 	// Interface name.
 	// +kubebuilder:default:=net1
+	// +optional
 	Interface string `json:"interface"`
 	// Multus Network name specified in network-attachments-definition.
+	// +kubebuilder:default:=neonvm-system/neonvm-overlay-net
+	// +optional
 	MultusNetwork string `json:"multusNetwork"`
 }
 
