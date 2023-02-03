@@ -1,9 +1,9 @@
 # Image URL to use all building/pushing image targets
 IMG ?= controller:dev
 IMG_RUNNER ?= runner:dev
+IMG_VXLAN ?= vxlan-controller:dev
 VM_EXAMPLE_SOURCE ?= postgres:15-alpine
 VM_EXAMPLE_IMAGE ?= vm-postgres:15-alpine
-VXLAN_IMAGE ?= vxlan-controller:dev
 
 # kernel for guests
 VM_KERNEL_VERSION ?= "5.15.80"
@@ -97,7 +97,7 @@ docker-build: build test ## Build docker image with the controller.
 	docker build --build-arg VM_RUNNER_IMAGE=$(IMG_RUNNER) -t $(IMG) .
 	docker build -t $(IMG_RUNNER) -f runner/Dockerfile .
 	bin/vm-builder -src $(VM_EXAMPLE_SOURCE) -dst $(VM_EXAMPLE_IMAGE)
-	docker build -t $(VXLAN_IMAGE) -f tools/vxlan/Dockerfile .
+	docker build -t $(IMG_VXLAN) -f tools/vxlan/Dockerfile .
 
 #.PHONY: docker-push
 #docker-push: ## Push docker image with the controller.
@@ -150,8 +150,8 @@ DEPLOYTS := $(shell date +%s)
 .PHONY: deploy
 deploy: kind-load manifests kustomize ## Deploy controller to the K8s cluster specified in ~/.kube/config.
 	cd config/common/controller              && $(KUSTOMIZE) edit set image controller=$(IMG)               && $(KUSTOMIZE) edit add annotation deploytime:$(DEPLOYTS) --force
-	cd config/default-vxlan/vxlan-controller && $(KUSTOMIZE) edit set image vxlan-controller=$(VXLAN_IMAGE) && $(KUSTOMIZE) edit add annotation deploytime:$(DEPLOYTS) --force
-	cd config/default-vxlan/vxlan-ipam       && $(KUSTOMIZE) edit set image vxlan-controller=$(VXLAN_IMAGE) && $(KUSTOMIZE) edit add annotation deploytime:$(DEPLOYTS) --force
+	cd config/default-vxlan/vxlan-controller && $(KUSTOMIZE) edit set image vxlan-controller=$(IMG_VXLAN) && $(KUSTOMIZE) edit add annotation deploytime:$(DEPLOYTS) --force
+	cd config/default-vxlan/vxlan-ipam       && $(KUSTOMIZE) edit set image vxlan-controller=$(IMG_VXLAN) && $(KUSTOMIZE) edit add annotation deploytime:$(DEPLOYTS) --force
 	$(KUSTOMIZE) build config/default-vxlan/multus > neonvm-multus.yaml
 	$(KUSTOMIZE) build config/default-vxlan > neonvm-vxlan.yaml
 	cd config/common/controller              && $(KUSTOMIZE) edit remove annotation deploytime
@@ -191,8 +191,8 @@ local-cluster:  ## Create local cluster by kind tool and prepared config
 kind-load: docker-build  ## Push docker images to the kind cluster.
 	kind load docker-image $(IMG)
 	kind load docker-image $(IMG_RUNNER)
+	kind load docker-image $(IMG_VXLAN)
 	kind load docker-image $(VM_EXAMPLE_IMAGE)
-	kind load docker-image $(VXLAN_IMAGE)
 
 ##@ Build Dependencies
 
