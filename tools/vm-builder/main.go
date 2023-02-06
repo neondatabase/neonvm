@@ -165,7 +165,7 @@ chmod 0755 /dev/pts
 chmod 1777 /dev/shm
 mount -t proc  proc  /proc
 mount -t sysfs sysfs /sys
-{{.}} # mount -t ( cgroup cgroup | cgroup2 cgroup2 ) /sys/fs/cgroup
+mount -t cgroup2 cgroup2 /sys/fs/cgroup
 mount -t devpts -o noexec,nosuid       devpts    /dev/pts
 mount -t tmpfs  -o noexec,nosuid,nodev shm-tmpfs /dev/shm
 
@@ -218,7 +218,6 @@ var (
 	size      = flag.String("size", "1G", `Size for disk image: --size=1G`)
 	outFile   = flag.String("file", "", `Save disk image as file: --file=vm-alpine.qcow2`)
 	forcePull = flag.Bool("pull", false, `Pull src image even if already present locally`)
-	cgroup2   = flag.Bool("cgroup2", false, `Mount cgroup v2 at /sys/fs/cgruop instead of v1`)
 )
 
 func printReader(reader io.ReadCloser) error {
@@ -269,13 +268,6 @@ func main() {
 		log.Printf("-dst not set, using %s\n", dstIm)
 	} else {
 		dstIm = *dstImage
-	}
-
-	var mountCgroupCommand string
-	if *cgroup2 {
-		mountCgroupCommand = "mount -t cgroup2 cgroup2 /sys/fs/cgroup"
-	} else {
-		mountCgroupCommand = "mount -t cgroup cgroup /sys/fs/cgroup"
 	}
 
 	ctx := context.Background()
@@ -369,27 +361,12 @@ func main() {
 		log.Fatalln(err)
 	}
 
-	// generate vminit script from template, based on cgroup type
-	scriptVmInitTmpl, err := template.New("vminit").Parse(scriptVmInit)
-	if err != nil {
-		log.Fatal(err)
-	}
-	var scriptVmInitBuffer bytes.Buffer
-	err = scriptVmInitTmpl.Execute(&scriptVmInitBuffer, mountCgroupCommand)
-	if err != nil {
-		log.Fatalln(err)
-	}
-
 	// add 'Dockerfile' file to docker build context
 	if err = AddToTar(tw, "Dockerfile", dockerfileVmBuilderBuffer); err != nil {
 		log.Fatalln(err)
 	}
 	// add 'vmstart' file to docker build context
 	if err = AddToTar(tw, "vmstart", scriptVmStartBuffer); err != nil {
-		log.Fatalln(err)
-	}
-	// add 'vminit' file to docker build context
-	if err = AddToTar(tw, "vminit", scriptVmInitBuffer); err != nil {
 		log.Fatalln(err)
 	}
 
@@ -411,6 +388,16 @@ func main() {
 		log.Fatalln(err)
 	}
 	if err = AddToTar(tw, "vmacpi", b); err != nil {
+		log.Fatalln(err)
+	}
+
+	// add 'vminit' file to docker build context
+	b.Reset()
+	_, err = b.WriteString(scriptVmInit)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	if err = AddToTar(tw, "vminit", b); err != nil {
 		log.Fatalln(err)
 	}
 
