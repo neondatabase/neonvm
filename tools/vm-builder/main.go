@@ -91,7 +91,7 @@ COPY --from=vm-runtime /neonvm /rootdisk/neonvm
 RUN set -e \
     && mkdir -p /rootdisk/etc \
     && mkdir /rootdisk/etc/vector \
-	&& (cp /rootdisk/etc/inittab /tmp/guest-inittab 2>&/dev/null || touch /tmp/guest-inittab) \
+	&& (cp /rootdisk/etc/inittab /tmp/guest-inittab 2>/dev/null || touch /tmp/guest-inittab) \
     && cp -f /rootdisk/neonvm/bin/inittab /rootdisk/etc/inittab \
 	&& cat /tmp/guest-inittab >> /rootdisk/etc/inittab \
     && mkfs.ext4 -L vmroot -d /rootdisk /disk.raw ${DISK_SIZE} \
