@@ -70,7 +70,9 @@ fmt: ## Run go fmt against code.
 
 .PHONY: vet
 vet: ## Run go vet against code.
-	go vet ./...
+	# `go vet` requires gcc
+	# ref https://github.com/golang/go/issues/56755
+	CGO_ENABLED=0 go vet ./...
 
 .PHONE: e2e
 e2e: ## Run e2e kuttl tests
