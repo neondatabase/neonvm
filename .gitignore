@@ -27,6 +27,7 @@ Dockerfile.cross
 
 *.qcow2
 vmlinuz
+vmlinuz.arm64
 neonvm.yaml
 neonvm-vxlan.yaml
 neonvm-multus.yaml

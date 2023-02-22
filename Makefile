@@ -140,6 +140,16 @@ kernel: ## Build linux kernel.
 		--no-cache \
 		--file hack/Dockerfile.kernel-builder .
 
+.PHONY: kernel-arm64
+kernel-arm64: ## Build linux kernel.
+	rm -f hack/vmlinuz.arm64
+	docker buildx build \
+		--build-arg KERNEL_VERSION=$(VM_KERNEL_VERSION) \
+		--output type=local,dest=hack/ \
+		--platform linux/arm64 \
+		--progress plain \
+		--file hack/Dockerfile.kernel-builder-arm64 .
+
 .PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
 	$(KUSTOMIZE) build config/crd | kubectl apply -f -
