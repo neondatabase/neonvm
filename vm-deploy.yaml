@@ -1,0 +1,23 @@
+---
+apiVersion: vm.neon.tech/v1
+kind: VirtualMachine
+metadata:
+  name: postgres14-disk-test
+  labels:
+    # Uncomment the line below to continuously migrate the VM (TESTING ONLY)
+    # autoscaler/testing-only-always-migrate: ""
+spec:
+  schedulerName: autoscale-scheduler
+  guest:
+    cpus: { min: 1, use: 1, max: 4 }
+    memorySlotSize: 1Gi
+    memorySlots: { min: 1, use: 1, max: 4 }
+    rootDisk:
+      image: localhost:5001/pg14-disk-test:latest
+      imagePullPolicy: Always # always re-pull, for testing.
+      size: 8Gi
+    ports:
+      - port: 22   # ssh
+      - port: 5432 # postgres
+      - port: 9100 # metrics
+      - port: 10301 # informant
