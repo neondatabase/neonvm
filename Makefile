@@ -147,7 +147,7 @@ kernel-arm64-cross: ## Build linux kernel for Aarch64.
 		--output type=local,dest=hack/ \
 		--pull \
 		--progress plain \
-		--file hack/Dockerfile.kernel-arm64-cross .
+		--file hack/Dockerfile.kernel-cross-arm64 .
 
 .PHONY: kernel-amd64-cross
 kernel-amd64-cross: ## Build linux kernel for x86_64.
@@ -157,7 +157,7 @@ kernel-amd64-cross: ## Build linux kernel for x86_64.
 		--output type=local,dest=hack/ \
 		--pull \
 		--progress plain \
-		--file hack/Dockerfile.kernel-amd64-cross .
+		--file hack/Dockerfile.kernel-cross-amd64 .
 
 .PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
