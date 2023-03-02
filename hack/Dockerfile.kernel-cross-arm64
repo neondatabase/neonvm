@@ -1,0 +1,38 @@
+FROM debian:bookworm AS build
+
+ARG KERNEL_VERSION
+
+RUN set -e \
+    && echo "Build linux  kernel ${KERNEL_VERSION}" \
+    && test -n "${KERNEL_VERSION}"
+
+WORKDIR /build
+
+RUN apt-get update && apt-get -y install --no-install-recommends \
+    curl \
+    ca-certificates \
+    fakeroot \
+    build-essential \
+    ncurses-dev \
+    flex \
+    bison \
+    libelf-dev \
+    bc \
+    libssl-dev \
+    cpio \
+    zstd \
+    gcc-aarch64-linux-gnu
+
+RUN set -e \
+    && mkdir linux \
+    && curl -sfL https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz -o linux-${KERNEL_VERSION}.tar.xz \
+    && tar --strip-components=1 -C linux -xf linux-${KERNEL_VERSION}.tar.xz
+
+ADD hack/linux-config-${KERNEL_VERSION}.arm64 linux/.config
+RUN set -e \
+    && cd linux \
+    && make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- -j `nproc` \
+    && cp `make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- image_name` /build/vmlinuz.arm64
+
+FROM scratch
+COPY --from=build /build/vmlinuz.arm64 /vmlinuz.arm64

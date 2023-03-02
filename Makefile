@@ -130,29 +130,34 @@ ifndef ignore-not-found
 endif
 
 .PHONY: kernel
-kernel: kernel-arm64 kernel-amd64 ## Build linux kernel for both archs.
+kernel: ## Build linux kernel for current arch.
+	rm -f hack/vmlinuz.arm64 hack/vmlinuz.amd64
+	docker buildx build \
+		--build-arg KERNEL_VERSION=$(VM_KERNEL_VERSION) \
+		--output type=local,dest=hack/ \
+		--pull \
+		--progress plain \
+		--file hack/Dockerfile.kernel .
 
-.PHONY: kernel-arm64
-kernel-arm64: ## Build linux kernel for Aarch64.
+.PHONY: kernel-arm64-cross
+kernel-arm64-cross: ## Build linux kernel for Aarch64.
 	rm -f hack/vmlinuz.arm64
 	docker buildx build \
 		--build-arg KERNEL_VERSION=$(VM_KERNEL_VERSION) \
 		--output type=local,dest=hack/ \
-		--platform linux/arm64 \
 		--pull \
 		--progress plain \
-		--file hack/Dockerfile.kernel-builder .
+		--file hack/Dockerfile.kernel-arm64-cross .
 
-.PHONY: kernel-amd64
-kernel-amd64: ## Build linux kernel for X86_64.
+.PHONY: kernel-amd64-cross
+kernel-amd64-cross: ## Build linux kernel for x86_64.
 	rm -f hack/vmlinuz.amd64
 	docker buildx build \
 		--build-arg KERNEL_VERSION=$(VM_KERNEL_VERSION) \
 		--output type=local,dest=hack/ \
-		--platform linux/amd64 \
 		--pull \
 		--progress plain \
-		--file hack/Dockerfile.kernel-builder .
+		--file hack/Dockerfile.kernel-amd64-cross .
 
 .PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
