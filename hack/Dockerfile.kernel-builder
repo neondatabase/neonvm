@@ -1,4 +1,4 @@
-FROM debian:11 AS build
+FROM debian:bookworm AS build
 
 ARG KERNEL_VERSION
 
@@ -8,28 +8,29 @@ RUN set -e \
 
 WORKDIR /build
 
-RUN apt-get update && apt-get -y install \
+RUN apt-get update && apt-get -y install --no-install-recommends \
     curl \
     ca-certificates \
-    git \
+    fakeroot \
     build-essential \
+    ncurses-dev \
     flex \
     bison \
     libelf-dev \
     bc \
     libssl-dev \
-    python3 \
     cpio \
     zstd
 
 RUN set -e \
     && mkdir linux \
-    && curl -sfL https://cdn.kernel.org/pub/linux/kernel/v5.x/linux-${KERNEL_VERSION}.tar.xz -o linux-${KERNEL_VERSION} \
-    && tar --strip-components=1 -C linux -xf linux-${KERNEL_VERSION}
+    && curl -sfL https://cdn.kernel.org/pub/linux/kernel/v6.x/linux-${KERNEL_VERSION}.tar.xz -o linux-${KERNEL_VERSION}.tar.xz \
+    && tar --strip-components=1 -C linux -xf linux-${KERNEL_VERSION}.tar.xz
 
-ADD hack/linux-config-${KERNEL_VERSION} linux/.config
-
-RUN cd linux && make -j `nproc`
+ARG TARGETARCH
+ADD hack/linux-config-${KERNEL_VERSION}.${TARGETARCH} linux/.config
+RUN cd linux && make -j `nproc` && cp `make image_name` /build/vmlinuz.${TARGETARCH}
 
 FROM scratch
-COPY --from=build /build/linux/arch/x86/boot/bzImage /vmlinuz
+ARG TARGETARCH
+COPY --from=build /build/vmlinuz.${TARGETARCH} /vmlinuz.${TARGETARCH}

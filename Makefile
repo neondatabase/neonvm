@@ -6,7 +6,7 @@ VM_EXAMPLE_SOURCE ?= postgres:15-alpine
 VM_EXAMPLE_IMAGE ?= vm-postgres:15-alpine
 
 # kernel for guests
-VM_KERNEL_VERSION ?= "5.15.80"
+VM_KERNEL_VERSION ?= "6.1.14"
 
 # ENVTEST_K8S_VERSION refers to the version of kubebuilder assets to be downloaded by envtest binary.
 ENVTEST_K8S_VERSION = 1.23.0
@@ -130,25 +130,29 @@ ifndef ignore-not-found
 endif
 
 .PHONY: kernel
-kernel: ## Build linux kernel.
-	rm -f hack/vmlinuz
-	docker buildx build \
-		--build-arg KERNEL_VERSION=$(VM_KERNEL_VERSION) \
-		--output type=local,dest=hack/ \
-		--platform linux/amd64 \
-		--pull \
-		--no-cache \
-		--file hack/Dockerfile.kernel-builder .
+kernel: kernel-arm64 kernel-amd64 ## Build linux kernel for both archs.
 
 .PHONY: kernel-arm64
-kernel-arm64: ## Build linux kernel.
+kernel-arm64: ## Build linux kernel for Aarch64.
 	rm -f hack/vmlinuz.arm64
 	docker buildx build \
 		--build-arg KERNEL_VERSION=$(VM_KERNEL_VERSION) \
 		--output type=local,dest=hack/ \
 		--platform linux/arm64 \
+		--pull \
 		--progress plain \
-		--file hack/Dockerfile.kernel-builder-arm64 .
+		--file hack/Dockerfile.kernel-builder .
+
+.PHONY: kernel-amd64
+kernel-amd64: ## Build linux kernel for X86_64.
+	rm -f hack/vmlinuz.amd64
+	docker buildx build \
+		--build-arg KERNEL_VERSION=$(VM_KERNEL_VERSION) \
+		--output type=local,dest=hack/ \
+		--platform linux/amd64 \
+		--pull \
+		--progress plain \
+		--file hack/Dockerfile.kernel-builder .
 
 .PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.

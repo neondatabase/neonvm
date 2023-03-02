@@ -87,6 +87,12 @@ make local-cluster
 
 #### 2. Build Linux kernel for Guests
 
+Create docker builder instance for multi-arch builds (if you haven't)
+
+```sh
+docker buildx create --name multiarch --platform linux/amd64,linux/arm64 --use
+```
+
 ```sh
 make kernel
 ```
