@@ -1,0 +1,50 @@
+FROM debian:bookworm AS build
+
+WORKDIR /build
+RUN apt-get update && apt-get -y install --no-install-recommends \
+    curl \
+    ca-certificates \
+    fakeroot \
+    build-essential \
+    ncurses-dev \
+    flex \
+    bison \
+    libelf-dev \
+    bc \
+    libssl-dev \
+    cpio \
+    zstd
+
+# cross compilers
+RUN apt-get update && apt-get -y install --no-install-recommends \
+    gcc-x86-64-linux-gnu \
+    gcc-aarch64-linux-gnu
+
+ARG KERNEL_VERSION
+ARG ARCH
+# check if build-args are set
+RUN set -e \
+    && test -n "${KERNEL_VERSION}" \
+    && test -n "${ARCH}"
+
+# download and unpack kernel
+RUN set -e \
+    && MAJOR=`echo ${KERNEL_VERSION} | cut -d '.' -f 1` \
+    && mkdir linux \
+    && curl -sfL https://cdn.kernel.org/pub/linux/kernel/v${MAJOR}.x/linux-${KERNEL_VERSION}.tar.xz -o linux-${KERNEL_VERSION}.tar.xz \
+    && tar --strip-components=1 -C linux -xf linux-${KERNEL_VERSION}.tar.xz
+
+# build kernel
+ADD hack/linux-config-${KERNEL_VERSION}.${ARCH} linux/.config
+RUN set -e \
+    && cd linux \
+    && case "${ARCH}" in \
+        "amd64") COMPILER_ARCH="x86";   COMPILER="x86_64-linux-gnu-" ;; \
+        "arm64") COMPILER_ARCH="arm64"; COMPILER="aarch64-linux-gnu-" ;; \
+       esac \
+    && make ARCH=${COMPILER_ARCH} CROSS_COMPILE=${COMPILER} -j `nproc` \
+    && cp `make ARCH=${COMPILER_ARCH} CROSS_COMPILE=${COMPILER} image_name` /build/vmlinuz.${ARCH}
+
+FROM scratch
+ARG ARCH
+COPY --from=build /build/vmlinuz.${ARCH} /vmlinuz.${ARCH}

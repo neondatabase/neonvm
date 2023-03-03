@@ -139,25 +139,27 @@ kernel: ## Build linux kernel for current arch.
 		--progress plain \
 		--file hack/Dockerfile.kernel .
 
-.PHONY: kernel-arm64-cross
-kernel-arm64-cross: ## Build linux kernel for Aarch64.
+.PHONY: kernel-cross-arm64
+kernel-cross-arm64: ## Build linux kernel for Aarch64.
 	rm -f hack/vmlinuz.arm64
 	docker buildx build \
 		--build-arg KERNEL_VERSION=$(VM_KERNEL_VERSION) \
+		--build-arg ARCH=arm64 \
 		--output type=local,dest=hack/ \
 		--pull \
 		--progress plain \
-		--file hack/Dockerfile.kernel-cross-arm64 .
+		--file hack/Dockerfile.kernel-cross .
 
-.PHONY: kernel-amd64-cross
-kernel-amd64-cross: ## Build linux kernel for x86_64.
+.PHONY: kernel-cross-amd64
+kernel-cross-amd64: ## Build linux kernel for x86_64.
 	rm -f hack/vmlinuz.amd64
 	docker buildx build \
 		--build-arg KERNEL_VERSION=$(VM_KERNEL_VERSION) \
+		--build-arg ARCH=amd64 \
 		--output type=local,dest=hack/ \
 		--pull \
 		--progress plain \
-		--file hack/Dockerfile.kernel-cross-amd64 .
+		--file hack/Dockerfile.kernel-cross .
 
 .PHONY: install
 install: manifests kustomize ## Install CRDs into the K8s cluster specified in ~/.kube/config.
