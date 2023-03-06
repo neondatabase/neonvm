@@ -584,7 +584,7 @@ func affinityForVirtualMachine(virtualmachine *vmv1.VirtualMachine) *corev1.Affi
 					{
 						Key:      "kubernetes.io/arch",
 						Operator: "In",
-						Values:   []string{"amd64"},
+						Values:   []string{"amd64", "arm64"},
 					},
 					{
 						Key:      "kubernetes.io/os",

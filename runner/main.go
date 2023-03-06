@@ -1,3 +1,5 @@
+// +build linux
+
 package main
 
 import (
@@ -16,6 +18,7 @@ import (
 	"regexp"
 	"strings"
 	"sync"
+	"runtime"
 
 	"github.com/alessio/shellescape"
 	"github.com/cilium/cilium/pkg/mac"
@@ -29,11 +32,11 @@ import (
 )
 
 const (
-	QEMU_BIN      = "qemu-system-x86_64"
+	QEMU_BIN      = "qemu-system-wrap"
 	QEMU_IMG_BIN  = "qemu-img"
 	kernelPath    = "/vm/kernel/vmlinuz"
-	kernelCmdline = "init=/neonvm/bin/init memhp_default_state=online_movable console=ttyS1 loglevel=7 root=/dev/vda rw"
-
+	kernelCmdlineAmd64 = "init=/neonvm/bin/init memhp_default_state=online_movable console=ttyS1   loglevel=7 root=/dev/vda rw"
+	kernelCmdlineArm64 = "init=/neonvm/bin/init memhp_default_state=online_movable console=ttyAMA0 loglevel=7 root=/dev/vda rw"
 	rootDiskPath    = "/vm/images/rootdisk.qcow2"
 	runtimeDiskPath = "/vm/images/runtime.iso"
 	mountedDiskPath = "/vm/images"
@@ -452,21 +455,31 @@ func main() {
 
 	// prepare qemu command line
 	qemuCmd := []string{
-		"-machine", "q35",
 		"-nographic",
 		"-no-reboot",
 		"-nodefaults",
 		"-only-migratable",
 		"-audiodev", "none,id=noaudio",
-		"-serial", "pty",
-		"-serial", "stdio",
+		"-vga", "none",
 		"-msg", "timestamp=on",
 		"-qmp", fmt.Sprintf("tcp:0.0.0.0:%d,server,wait=off", vmSpec.QMP),
 	}
 
-	// kernel details
-	qemuCmd = append(qemuCmd, "-kernel", kernelPath)
-	qemuCmd = append(qemuCmd, "-append", kernelCmdline)
+	// select machine type regarding arch
+	switch {
+	case runtime.GOARCH == "amd64":
+		qemuCmd = append(qemuCmd, "-machine", "q35")
+		qemuCmd = append(qemuCmd, "-serial", "pty", "-serial", "stdio")
+		qemuCmd = append(qemuCmd, "-kernel", kernelPath)
+		qemuCmd = append(qemuCmd, "-append", kernelCmdlineAmd64)
+	case runtime.GOARCH == "arm64":
+		qemuCmd = append(qemuCmd, "-machine", "virt,gic-version=3,accel=kvm:tcg")
+		qemuCmd = append(qemuCmd, "-chardev", "pty,id=ttyS0", "-device", "pci-serial,chardev=ttyS0", "-serial", "stdio")
+		qemuCmd = append(qemuCmd, "-kernel", kernelPath)
+		qemuCmd = append(qemuCmd, "-append", kernelCmdlineArm64)
+	default:
+		// do nothing
+	}
 
 	// disk details
 	qemuCmd = append(qemuCmd, "-drive", fmt.Sprintf("id=rootdisk,file=%s,if=virtio,media=disk,index=0,cache=none", rootDiskPath))

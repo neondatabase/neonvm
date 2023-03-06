@@ -24,6 +24,7 @@ RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o /v
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o /vxlan-ipam       tools/vxlan/ipam/main.go
 
 FROM alpine:3.16
+ARG TARGETARCH
 
 RUN apk add --no-cache \
     tini \
@@ -33,13 +34,13 @@ RUN apk add --no-cache \
 
 # add CNI plugins
 RUN set -e \
-    && wget -q https://github.com/containernetworking/plugins/releases/download/v1.2.0/cni-plugins-linux-amd64-v1.2.0.tgz -O cni.tgz \
+    && wget -q https://github.com/containernetworking/plugins/releases/download/v1.2.0/cni-plugins-linux-${TARGETARCH}-v1.2.0.tgz -O cni.tgz \
     && mkdir -p /opt/cni/bin \
     && tar -xzf cni.tgz -C /opt/cni/bin \
     && rm -f cni.tgz
 
 RUN set -e \
-    && wget -q https://github.com/grpc-ecosystem/grpc-health-probe/releases/latest/download/grpc_health_probe-linux-amd64 -O /usr/bin/grpc_health_probe \
+    && wget -q https://github.com/grpc-ecosystem/grpc-health-probe/releases/latest/download/grpc_health_probe-linux-${TARGETARCH} -O /usr/bin/grpc_health_probe \
     && chmod +x /usr/bin/grpc_health_probe
 
 COPY --from=builder /vxlan-controller /usr/bin/vxlan-controller

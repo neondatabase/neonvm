@@ -25,6 +25,7 @@ COPY runner/ runner/
 RUN CGO_ENABLED=0 GOOS=${TARGETOS:-linux} GOARCH=${TARGETARCH} go build -a -o /runner runner/main.go
 
 FROM alpine:3.16
+ARG TARGETARCH
 
 RUN apk add --no-cache \
     tini \
@@ -37,11 +38,15 @@ RUN apk add --no-cache \
     socat \
     jq \
     busybox-extras \
-    e2fsprogs \
-    qemu-system-x86_64 \
-    qemu-img
+    e2fsprogs
+
+RUN set -e \
+    && case "${TARGETARCH}" in \
+        "amd64") apk add --no-cache qemu-system-x86_64  qemu-img ; ln -s /usr/bin/qemu-system-x86_64  /usr/bin/qemu-system-wrap ;; \
+        "arm64") apk add --no-cache qemu-system-aarch64 qemu-img ; ln -s /usr/bin/qemu-system-aarch64 /usr/bin/qemu-system-wrap ;; \
+       esac
 
 COPY --from=builder /runner /usr/bin/runner
-COPY hack/vmlinuz /vm/kernel/vmlinuz
+COPY hack/vmlinuz.${TARGETARCH} /vm/kernel/vmlinuz
 
 ENTRYPOINT ["/sbin/tini", "--", "runner"]

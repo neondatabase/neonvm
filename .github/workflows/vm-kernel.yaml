@@ -7,7 +7,7 @@ on:
 
 env:
   VM_KERNEL_IMAGE:   "neondatabase/vm-kernel"
-  VM_KERNEL_VERSION: "5.15.80"
+  VM_KERNEL_VERSION: "6.1.14"
 
 jobs:
   vm-kernel:
@@ -27,14 +27,28 @@ jobs:
           username: ${{ secrets.NEON_DOCKERHUB_USERNAME }}
           password: ${{ secrets.NEON_DOCKERHUB_PASSWORD }}
 
-      - name: build linux kernel
+      - name: build linux kernel for arm64
         uses: docker/build-push-action@v3
         with:
-          build-args: KERNEL_VERSION=${{ env.VM_KERNEL_VERSION }}
           context: .
-          platforms: linux/amd64
           push: true
           pull: true
           no-cache: true
-          file: hack/Dockerfile.kernel-builder
-          tags: ${{ env.VM_KERNEL_IMAGE }}:${{ env.VM_KERNEL_VERSION }}
+          file: hack/Dockerfile.kernel-cross .
+          tags: ${{ env.VM_KERNEL_IMAGE }}:${{ env.VM_KERNEL_VERSION }}-arm64
+          build-args: |
+            KERNEL_VERSION=${{ env.VM_KERNEL_VERSION }}
+            ARCH=arm64
+
+      - name: build linux kernel for amd64
+        uses: docker/build-push-action@v3
+        with:
+          context: .
+          push: true
+          pull: true
+          no-cache: true
+          file: hack/Dockerfile.kernel-cross .
+          tags: ${{ env.VM_KERNEL_IMAGE }}:${{ env.VM_KERNEL_VERSION }}-amd64
+          build-args: |
+            KERNEL_VERSION=${{ env.VM_KERNEL_VERSION }}
+            ARCH=amd64

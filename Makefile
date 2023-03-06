@@ -21,6 +21,8 @@ else
 GOBIN=$(shell go env GOBIN)
 endif
 
+GOOS=$(shell go env GOOS)
+
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
 SHELL = /usr/bin/env bash -o pipefail
@@ -82,10 +84,12 @@ test: fmt vet envtest ## Run tests.
 .PHONY: build
 build: fmt vet ## Build controller binary.
 	go build -o bin/controller       main.go
-	go build -o bin/vxlan-controller tools/vxlan/controller/main.go
 	go build -o bin/vxlan-ipam       tools/vxlan/ipam/main.go
-	go build -o bin/runner           runner/main.go
 	go build -o bin/vm-builder       tools/vm-builder/main.go
+ifeq ($(GOOS),linux)
+	go build -o bin/runner runner/main.go
+	go build -o bin/vxlan-controller tools/vxlan/controller/main.go
+endif
 
 .PHONY: run
 run: fmt vet ## Run a controller from your host.
@@ -96,10 +100,12 @@ run: fmt vet ## Run a controller from your host.
 # More info: https://docs.docker.com/develop/develop-images/build_enhancements/
 .PHONY: docker-build
 docker-build: build test ## Build docker image with the controller.
-	docker build --build-arg VM_RUNNER_IMAGE=$(IMG_RUNNER) -t $(IMG) .
-	docker build -t $(IMG_RUNNER) -f runner/Dockerfile .
+	docker buildx build --load --build-arg VM_RUNNER_IMAGE=$(IMG_RUNNER) -t $(IMG) .
+	docker buildx build --load -t $(IMG_RUNNER) -f runner/Dockerfile .
+	docker buildx build --load -t $(IMG_VXLAN) -f tools/vxlan/Dockerfile .
+ifeq ($(GOOS),linux)
 	bin/vm-builder -src $(VM_EXAMPLE_SOURCE) -dst $(VM_EXAMPLE_IMAGE)
-	docker build -t $(IMG_VXLAN) -f tools/vxlan/Dockerfile .
+endif
 
 #.PHONY: docker-push
 #docker-push: ## Push docker image with the controller.
@@ -136,7 +142,6 @@ kernel: ## Build linux kernel for current arch.
 		--build-arg KERNEL_VERSION=$(VM_KERNEL_VERSION) \
 		--output type=local,dest=hack/ \
 		--pull \
-		--progress plain \
 		--file hack/Dockerfile.kernel .
 
 .PHONY: kernel-cross-arm64
@@ -147,7 +152,6 @@ kernel-cross-arm64: ## Build linux kernel for Aarch64.
 		--build-arg ARCH=arm64 \
 		--output type=local,dest=hack/ \
 		--pull \
-		--progress plain \
 		--file hack/Dockerfile.kernel-cross .
 
 .PHONY: kernel-cross-amd64
@@ -158,7 +162,6 @@ kernel-cross-amd64: ## Build linux kernel for x86_64.
 		--build-arg ARCH=amd64 \
 		--output type=local,dest=hack/ \
 		--pull \
-		--progress plain \
 		--file hack/Dockerfile.kernel-cross .
 
 .PHONY: install
@@ -215,7 +218,7 @@ kind-load: docker-build  ## Push docker images to the kind cluster.
 	kind load docker-image $(IMG)
 	kind load docker-image $(IMG_RUNNER)
 	kind load docker-image $(IMG_VXLAN)
-	kind load docker-image $(VM_EXAMPLE_IMAGE)
+#	kind load docker-image $(VM_EXAMPLE_IMAGE)
 
 ##@ Build Dependencies
 
