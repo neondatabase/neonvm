@@ -22,6 +22,7 @@ GOBIN=$(shell go env GOBIN)
 endif
 
 GOOS=$(shell go env GOOS)
+GOARCH=$(shell go env GOARCH)
 
 # Setting SHELL to bash allows bash commands to be executed by recipes.
 # Options are set to exit when a recipe line exits non-zero or a piped command fails.
@@ -103,7 +104,7 @@ docker-build: build test ## Build docker image with the controller.
 	docker buildx build --load --build-arg VM_RUNNER_IMAGE=$(IMG_RUNNER) -t $(IMG) .
 	docker buildx build --load -t $(IMG_RUNNER) -f runner/Dockerfile .
 	docker buildx build --load -t $(IMG_VXLAN) -f tools/vxlan/Dockerfile .
-ifeq ($(GOOS),linux)
+ifeq ($(GOARCH),amd64)
 	bin/vm-builder -src $(VM_EXAMPLE_SOURCE) -dst $(VM_EXAMPLE_IMAGE)
 endif
 
