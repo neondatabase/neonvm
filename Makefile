@@ -219,7 +219,9 @@ kind-load: docker-build  ## Push docker images to the kind cluster.
 	kind load docker-image $(IMG)
 	kind load docker-image $(IMG_RUNNER)
 	kind load docker-image $(IMG_VXLAN)
-#	kind load docker-image $(VM_EXAMPLE_IMAGE)
+ifeq ($(GOARCH),amd64)
+	kind load docker-image $(VM_EXAMPLE_IMAGE)
+endif
 
 ##@ Build Dependencies
 
