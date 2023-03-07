@@ -1,3 +1,4 @@
+//go:build linux
 // +build linux
 
 package main
@@ -16,9 +17,9 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strings"
 	"sync"
-	"runtime"
 
 	"github.com/alessio/shellescape"
 	"github.com/cilium/cilium/pkg/mac"

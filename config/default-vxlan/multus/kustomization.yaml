@@ -3,3 +3,8 @@ kind: Kustomization
 
 bases:
 - https://raw.githubusercontent.com/k8snetworkplumbingwg/multus-cni/v3.9.3/deployments/multus-daemonset-thick-plugin.yml
+
+images:
+- name: ghcr.io/k8snetworkplumbingwg/multus-cni
+  newName: ghcr.io/k8snetworkplumbingwg/multus-cni
+  newTag: v3.9.3
