@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"os"
 	"reflect"
+	goruntime "runtime"
 	"strings"
 	"time"
 
@@ -402,37 +403,46 @@ func (r *VirtualMachineReconciler) doReconcile(ctx context.Context, virtualmachi
 			// update Node name where runner working
 			virtualmachine.Status.Node = vmRunner.Spec.NodeName
 
-			// do hotplug/unplug CPU if .spec.guest.cpus.use defined
-			if virtualmachine.Spec.Guest.CPUs.Use != nil {
-				// firstly get current state from QEMU
-				cpusPlugged, _, err := QmpGetCpus(virtualmachine)
-				if err != nil {
-					log.Error(err, "Failed to get CPU details from VirtualMachine", "VirtualMachine", virtualmachine.Name)
-					return err
-				}
-				// compare guest spec and count of plugged
-				if *virtualmachine.Spec.Guest.CPUs.Use > int32(len(cpusPlugged)) {
-					// going to plug one CPU
-					if err := QmpPlugCpu(virtualmachine); err != nil {
+			switch {
+			case goruntime.GOARCH == "amd64":
+				// do hotplug/unplug CPU if .spec.guest.cpus.use defined
+				if virtualmachine.Spec.Guest.CPUs.Use != nil {
+					// firstly get current state from QEMU
+					cpusPlugged, _, err := QmpGetCpus(virtualmachine)
+					if err != nil {
+						log.Error(err, "Failed to get CPU details from VirtualMachine", "VirtualMachine", virtualmachine.Name)
 						return err
 					}
-				} else if *virtualmachine.Spec.Guest.CPUs.Use < int32(len(cpusPlugged)) {
-					// going to unplug one CPU
-					if err := QmpUnplugCpu(virtualmachine); err != nil {
-						return err
+					// compare guest spec and count of plugged
+					if *virtualmachine.Spec.Guest.CPUs.Use > int32(len(cpusPlugged)) {
+						// going to plug one CPU
+						if err := QmpPlugCpu(virtualmachine); err != nil {
+							return err
+						}
+					} else if *virtualmachine.Spec.Guest.CPUs.Use < int32(len(cpusPlugged)) {
+						// going to unplug one CPU
+						if err := QmpUnplugCpu(virtualmachine); err != nil {
+							return err
+						}
 					}
 				}
+			case goruntime.GOARCH == "arm64":
+				// do hotplug/unplug CPU if .spec.guest.cpus.use defined
+				// but... arm64 still doesn't support cpu hotplug
+				// error: The feature 'query-hotpluggable-cpus' is not enabled
+			default:
+				// do nothing
 			}
 
 			// get CPU details from QEMU and upate status
-			cpusPlugged, _, err := QmpGetCpus(virtualmachine)
+			cpus, err := QmpGetCpusFast(virtualmachine)
 			if err != nil {
 				log.Error(err, "Failed to get CPU details from VirtualMachine", "VirtualMachine", virtualmachine.Name)
 				return err
 			}
-			if virtualmachine.Status.CPUs != len(cpusPlugged) {
+			if virtualmachine.Status.CPUs != cpus {
 				// update status by count of CPU cores used in VM
-				virtualmachine.Status.CPUs = len(cpusPlugged)
+				virtualmachine.Status.CPUs = cpus
 				// record event about cpus used in VM
 				r.Recorder.Event(virtualmachine, "Normal", "CpuInfo",
 					fmt.Sprintf("VirtualMachine %s uses %d cpu cores",
@@ -440,26 +450,35 @@ func (r *VirtualMachineReconciler) doReconcile(ctx context.Context, virtualmachi
 						virtualmachine.Status.CPUs))
 			}
 
-			// do hotplug/unplug Memory if .spec.guest.memorySlots.use defined
-			if virtualmachine.Spec.Guest.MemorySlots.Use != nil {
-				// firstly get current state from QEMU
-				memoryDevices, err := QmpQueryMemoryDevices(virtualmachine)
-				if err != nil {
-					log.Error(err, "Failed to get Memory details from VirtualMachine", "VirtualMachine", virtualmachine.Name)
-					return err
-				}
-				// compare guest spec and count of plugged
-				if *virtualmachine.Spec.Guest.MemorySlots.Use > *virtualmachine.Spec.Guest.MemorySlots.Min+int32(len(memoryDevices)) {
-					// going to plug one Memory Slot
-					if err := QmpPlugMemory(virtualmachine); err != nil {
+			switch {
+			case goruntime.GOARCH == "amd64":
+				// do hotplug/unplug Memory if .spec.guest.memorySlots.use defined
+				if virtualmachine.Spec.Guest.MemorySlots.Use != nil {
+					// firstly get current state from QEMU
+					memoryDevices, err := QmpQueryMemoryDevices(virtualmachine)
+					if err != nil {
+						log.Error(err, "Failed to get Memory details from VirtualMachine", "VirtualMachine", virtualmachine.Name)
 						return err
 					}
-				} else if *virtualmachine.Spec.Guest.MemorySlots.Use < *virtualmachine.Spec.Guest.MemorySlots.Min+int32(len(memoryDevices)) {
-					// going to unplug one Memory Slot
-					if err := QmpUnplugMemory(virtualmachine); err != nil {
-						return err
+					// compare guest spec and count of plugged
+					if *virtualmachine.Spec.Guest.MemorySlots.Use > *virtualmachine.Spec.Guest.MemorySlots.Min+int32(len(memoryDevices)) {
+						// going to plug one Memory Slot
+						if err := QmpPlugMemory(virtualmachine); err != nil {
+							return err
+						}
+					} else if *virtualmachine.Spec.Guest.MemorySlots.Use < *virtualmachine.Spec.Guest.MemorySlots.Min+int32(len(memoryDevices)) {
+						// going to unplug one Memory Slot
+						if err := QmpUnplugMemory(virtualmachine); err != nil {
+							return err
+						}
 					}
 				}
+			case goruntime.GOARCH == "arm64":
+				// do hotplug/unplug Memory if .spec.guest.memorySlots.use defined
+				// but... arm64 still doesn't support memory hotplug
+				// error: memory hotplug is not enabled: missing acpi-ged device
+			default:
+				// do nothing
 			}
 
 			// get Memory details from hypervisor and upate VM status

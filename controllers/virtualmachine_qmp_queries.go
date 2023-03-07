@@ -13,6 +13,51 @@ import (
 	vmv1 "github.com/neondatabase/neonvm/apis/neonvm/v1"
 )
 
+/*
+
+  "return": [
+    {
+      "thread-id": 63501,
+      "props": {
+        "core-id": 0,
+        "thread-id": 0,
+        "socket-id": 0,
+        "cluster-id": 0
+      },
+      "qom-path": "/machine/unattached/device[0]",
+      "cpu-index": 0,
+      "target": "aarch64"
+    },
+    {
+      "thread-id": 63501,
+      "props": {
+        "core-id": 1,
+        "thread-id": 0,
+        "socket-id": 0,
+        "cluster-id": 0
+      },
+      "qom-path": "/machine/unattached/device[1]",
+      "cpu-index": 1,
+      "target": "aarch64"
+    }
+  ]
+
+*/
+
+type QmpCpusFast struct {
+	Return []struct {
+		Props struct {
+			CoreId    int32 `json:"core-id"`
+			ThreadId  int32 `json:"thread-id"`
+			SocketId  int32 `json:"socket-id"`
+			ClusterId int32 `json:"cluster-id"`
+		} `json:"props"`
+		CpuIndex int32   `json:"cpu-index"`
+		QomPath  *string `json:"qom-path"`
+		Target   string  `json:"target"`
+	} `json:"return"`
+}
+
 type QmpCpus struct {
 	Return []struct {
 		Props struct {
@@ -135,6 +180,25 @@ func QmpGetCpus(virtualmachine *vmv1.VirtualMachine) ([]QmpCpuSlot, []QmpCpuSlot
 	}
 
 	return plugged, empty, nil
+}
+
+func QmpGetCpusFast(virtualmachine *vmv1.VirtualMachine) (int, error) {
+	mon, err := QmpConnect(virtualmachine)
+	if err != nil {
+		return 0, err
+	}
+	defer mon.Disconnect()
+
+	qmpcmd := []byte(`{"execute": "query-cpus-fast"}`)
+	raw, err := mon.Run(qmpcmd)
+	if err != nil {
+		return 0, err
+	}
+
+	var result QmpCpusFast
+	json.Unmarshal(raw, &result)
+
+	return len(result.Return), nil
 }
 
 func QmpGetCpusFromRunner(ip string, port int32) ([]QmpCpuSlot, []QmpCpuSlot, error) {
