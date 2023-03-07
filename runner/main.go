@@ -635,6 +635,17 @@ func defaultNetwork(cidr string, ports []vmv1.Port) (mac.MAC, error) {
 		return nil, err
 	}
 
+	// tune sysctl params
+	//
+	// Max number of inotify instances and watches for a user
+	// Since dockerd runs as a single user, the default instances value of 128 per user is too low
+	if err := execFg("sysctl", "-w", "fs.inotify.max_user_instances = 8192"); err != nil {
+		return nil, err
+	}
+	if err := execFg("sysctl", "-w", "fs.inotify.max_user_watches = 524288"); err != nil {
+		return nil, err
+	}
+
 	// enable routing
 	if err := execFg("sysctl", "-w", "net.ipv4.ip_forward=1"); err != nil {
 		return nil, err
