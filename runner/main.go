@@ -35,8 +35,8 @@ const (
 	QEMU_BIN      = "qemu-system-wrap"
 	QEMU_IMG_BIN  = "qemu-img"
 	kernelPath    = "/vm/kernel/vmlinuz"
-	kernelCmdlineAmd64 = "init=/neonvm/bin/init memhp_default_state=online_movable console=ttyS1   loglevel=7 root=/dev/vda rw"
-	kernelCmdlineArm64 = "init=/neonvm/bin/init memhp_default_state=online_movable console=ttyAMA0 loglevel=7 root=/dev/vda rw"
+	kernelCmdline = "init=/neonvm/bin/init memhp_default_state=online_movable loglevel=7 root=/dev/vda rw"
+
 	rootDiskPath    = "/vm/images/rootdisk.qcow2"
 	runtimeDiskPath = "/vm/images/runtime.iso"
 	mountedDiskPath = "/vm/images"
@@ -471,12 +471,12 @@ func main() {
 		qemuCmd = append(qemuCmd, "-machine", "q35")
 		qemuCmd = append(qemuCmd, "-serial", "pty", "-serial", "stdio")
 		qemuCmd = append(qemuCmd, "-kernel", kernelPath)
-		qemuCmd = append(qemuCmd, "-append", kernelCmdlineAmd64)
+		qemuCmd = append(qemuCmd, "-append", fmt.Sprintf("%s console=ttyS1", kernelCmdline))
 	case runtime.GOARCH == "arm64":
 		qemuCmd = append(qemuCmd, "-machine", "virt,gic-version=3,accel=kvm:tcg")
 		qemuCmd = append(qemuCmd, "-chardev", "pty,id=ttyS0", "-device", "pci-serial,chardev=ttyS0", "-serial", "stdio")
 		qemuCmd = append(qemuCmd, "-kernel", kernelPath)
-		qemuCmd = append(qemuCmd, "-append", kernelCmdlineArm64)
+		qemuCmd = append(qemuCmd, "-append", fmt.Sprintf("%s console=ttyAMA0", kernelCmdline))
 	default:
 		// do nothing
 	}
