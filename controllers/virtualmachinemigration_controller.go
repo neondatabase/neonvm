@@ -20,6 +20,7 @@ import (
 	"context"
 	"fmt"
 	"math"
+	goruntime "runtime"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
@@ -323,51 +324,71 @@ func (r *VirtualMachineMigrationReconciler) doReconcile(ctx context.Context, vir
 			virtualmachinemigration.Status.TargetPodIP = targetRunner.Status.PodIP
 
 			readyToMigrateCPU := false
-			// do hotplugCPU in targetRunner before migration if .spec.guest.cpus.use defined
-			if vm.Spec.Guest.CPUs.Use != nil {
-				// firstly get current state from QEMU
-				cpusPlugged, _, err := QmpGetCpusFromRunner(virtualmachinemigration.Status.TargetPodIP, vm.Spec.QMP)
-				if err != nil {
-					log.Error(err, "Failed to get CPU details from Target Runner", "Pod", virtualmachinemigration.Status.TargetPodName)
-					return err
-				}
-				// compare guest spec and count of plugged
-				if *vm.Spec.Guest.CPUs.Use > int32(len(cpusPlugged)) {
-					// going to plug one CPU
-					err := QmpPlugCpuToRunner(virtualmachinemigration.Status.TargetPodIP, vm.Spec.QMP)
+			switch {
+			case goruntime.GOARCH == "amd64":
+				// do hotplugCPU in targetRunner before migration if .spec.guest.cpus.use defined
+				if vm.Spec.Guest.CPUs.Use != nil {
+					// firstly get current state from QEMU
+					cpusPlugged, _, err := QmpGetCpusFromRunner(virtualmachinemigration.Status.TargetPodIP, vm.Spec.QMP)
 					if err != nil {
+						log.Error(err, "Failed to get CPU details from Target Runner", "Pod", virtualmachinemigration.Status.TargetPodName)
 						return err
-					} else {
-						log.Info("Plugged CPU to Target Pod", "Pod.Name", virtualmachinemigration.Status.TargetPodName)
 					}
-				} else {
-					// seems all CPUs plugged to target runner
-					readyToMigrateCPU = true
+					// compare guest spec and count of plugged
+					if *vm.Spec.Guest.CPUs.Use > int32(len(cpusPlugged)) {
+						// going to plug one CPU
+						err := QmpPlugCpuToRunner(virtualmachinemigration.Status.TargetPodIP, vm.Spec.QMP)
+						if err != nil {
+							return err
+						} else {
+							log.Info("Plugged CPU to Target Pod", "Pod.Name", virtualmachinemigration.Status.TargetPodName)
+						}
+					} else {
+						// seems all CPUs plugged to target runner
+						readyToMigrateCPU = true
+					}
 				}
+			case goruntime.GOARCH == "arm64":
+				// do hotplug/unplug CPU if .spec.guest.cpus.use defined
+				// but... arm64 still doesn't support cpu hotplug
+				// error: The feature 'query-hotpluggable-cpus' is not enabled
+				readyToMigrateCPU = true
+			default:
+				// do nothing
 			}
 
 			readyToMigrateMemory := false
-			// do hotplug Memory in targetRunner if .spec.guest.memorySlots.use defined
-			if vm.Spec.Guest.MemorySlots.Use != nil {
-				// firstly get current state from QEMU
-				memoryDevices, err := QmpQueryMemoryDevicesFromRunner(virtualmachinemigration.Status.TargetPodIP, vm.Spec.QMP)
-				if err != nil {
-					log.Error(err, "Failed to get Memory details from Target Runner", "Pod", virtualmachinemigration.Status.TargetPodName)
-					return err
-				}
-				// compare guest spec and count of plugged
-				if *vm.Spec.Guest.MemorySlots.Use > *vm.Spec.Guest.MemorySlots.Min+int32(len(memoryDevices)) {
-					// going to plug one Memory Slot
-					err := QmpPlugMemoryToRunner(virtualmachinemigration.Status.TargetPodIP, vm.Spec.QMP, vm.Spec.Guest.MemorySlotSize.Value())
+			switch {
+			case goruntime.GOARCH == "amd64":
+				// do hotplug Memory in targetRunner if .spec.guest.memorySlots.use defined
+				if vm.Spec.Guest.MemorySlots.Use != nil {
+					// firstly get current state from QEMU
+					memoryDevices, err := QmpQueryMemoryDevicesFromRunner(virtualmachinemigration.Status.TargetPodIP, vm.Spec.QMP)
 					if err != nil {
+						log.Error(err, "Failed to get Memory details from Target Runner", "Pod", virtualmachinemigration.Status.TargetPodName)
 						return err
-					} else {
-						log.Info("Plugged Memory to Target Pod", "Pod.Name", virtualmachinemigration.Status.TargetPodName)
 					}
-				} else {
-					// seems all Memory Slots plugged to target runner
-					readyToMigrateMemory = true
+					// compare guest spec and count of plugged
+					if *vm.Spec.Guest.MemorySlots.Use > *vm.Spec.Guest.MemorySlots.Min+int32(len(memoryDevices)) {
+						// going to plug one Memory Slot
+						err := QmpPlugMemoryToRunner(virtualmachinemigration.Status.TargetPodIP, vm.Spec.QMP, vm.Spec.Guest.MemorySlotSize.Value())
+						if err != nil {
+							return err
+						} else {
+							log.Info("Plugged Memory to Target Pod", "Pod.Name", virtualmachinemigration.Status.TargetPodName)
+						}
+					} else {
+						// seems all Memory Slots plugged to target runner
+						readyToMigrateMemory = true
+					}
 				}
+			case goruntime.GOARCH == "arm64":
+				// do hotplug/unplug Memory if .spec.guest.memorySlots.use defined
+				// but... arm64 still doesn't support memory hotplug
+				// error: memory hotplug is not enabled: missing acpi-ged device
+				readyToMigrateMemory = true
+			default:
+				// do nothing
 			}
 
 			// Migrate only running VMs to target with plugged devices

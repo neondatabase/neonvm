@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"runtime"
 	"strings"
 	"time"
 
@@ -12,37 +13,6 @@ import (
 
 	vmv1 "github.com/neondatabase/neonvm/apis/neonvm/v1"
 )
-
-/*
-
-  "return": [
-    {
-      "thread-id": 63501,
-      "props": {
-        "core-id": 0,
-        "thread-id": 0,
-        "socket-id": 0,
-        "cluster-id": 0
-      },
-      "qom-path": "/machine/unattached/device[0]",
-      "cpu-index": 0,
-      "target": "aarch64"
-    },
-    {
-      "thread-id": 63501,
-      "props": {
-        "core-id": 1,
-        "thread-id": 0,
-        "socket-id": 0,
-        "cluster-id": 0
-      },
-      "qom-path": "/machine/unattached/device[1]",
-      "cpu-index": 1,
-      "target": "aarch64"
-    }
-  ]
-
-*/
 
 type QmpCpusFast struct {
 	Return []struct {
@@ -522,6 +492,7 @@ func QmpStartMigration(virtualmachine *vmv1.VirtualMachine, virtualmachinemigrat
 	cache := resource.MustParse("256Mi")
 	var qmpcmd []byte
 	// setup migration on source runner
+	// arm64 doesn't support postcopy, will override value from VM spec by 'false'
 	qmpcmd = []byte(fmt.Sprintf(`{
 		"execute": "migrate-set-capabilities",
 		"arguments":
@@ -534,7 +505,7 @@ func QmpStartMigration(virtualmachine *vmv1.VirtualMachine, virtualmachinemigrat
 			    {"capability": "zero-blocks",   "state": true}
 			]
 		    }
-		}`, virtualmachinemigration.Spec.AllowPostCopy, virtualmachinemigration.Spec.AutoConverge))
+		}`, runtime.GOARCH == "amd64" && virtualmachinemigration.Spec.AllowPostCopy, virtualmachinemigration.Spec.AutoConverge))
 	_, err = smon.Run(qmpcmd)
 	if err != nil {
 		return err
@@ -554,6 +525,7 @@ func QmpStartMigration(virtualmachine *vmv1.VirtualMachine, virtualmachinemigrat
 	}
 
 	// setup migration on target runner
+	// arm64 doesn't support postcopy, will override value from VM spec by 'false'
 	qmpcmd = []byte(fmt.Sprintf(`{
 		"execute": "migrate-set-capabilities",
 		"arguments":
@@ -566,7 +538,7 @@ func QmpStartMigration(virtualmachine *vmv1.VirtualMachine, virtualmachinemigrat
 			    {"capability": "zero-blocks",   "state": true}
 			]
 		    }
-		}`, virtualmachinemigration.Spec.AllowPostCopy, virtualmachinemigration.Spec.AutoConverge))
+		}`, runtime.GOARCH == "amd64" && virtualmachinemigration.Spec.AllowPostCopy, virtualmachinemigration.Spec.AutoConverge))
 	_, err = tmon.Run(qmpcmd)
 	if err != nil {
 		return err
@@ -599,10 +571,14 @@ func QmpStartMigration(virtualmachine *vmv1.VirtualMachine, virtualmachinemigrat
 	if err != nil {
 		return err
 	}
-	qmpcmd = []byte(`{"execute": "migrate-start-postcopy"}`)
-	_, err = smon.Run(qmpcmd)
-	if err != nil {
-		return err
+
+	// arm64 doesn't support postcopy, trigger it for amd64 only
+	if runtime.GOARCH == "amd64" {
+		qmpcmd = []byte(`{"execute": "migrate-start-postcopy"}`)
+		_, err = smon.Run(qmpcmd)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil
