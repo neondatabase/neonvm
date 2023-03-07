@@ -470,11 +470,13 @@ func main() {
 	switch {
 	case runtime.GOARCH == "amd64":
 		qemuCmd = append(qemuCmd, "-machine", "q35")
-		qemuCmd = append(qemuCmd, "-serial", "pty", "-serial", "stdio")
+		qemuCmd = append(qemuCmd, "-chardev", "pty,id=ttyS0", "-device", "pci-serial,chardev=ttyS0")
+		qemuCmd = append(qemuCmd, "-chardev", "stdio,id=ttyS1", "-device", "pci-serial,chardev=ttyS1")
 		qemuCmd = append(qemuCmd, "-kernel", kernelPath)
 		qemuCmd = append(qemuCmd, "-append", fmt.Sprintf("%s console=ttyS1", kernelCmdline))
 	case runtime.GOARCH == "arm64":
-		qemuCmd = append(qemuCmd, "-machine", "virt,gic-version=3,accel=kvm:tcg")
+		//qemuCmd = append(qemuCmd, "-machine", "virt,gic-version=3,accel=kvm:tcg")
+		qemuCmd = append(qemuCmd, "-machine", "virt")
 		qemuCmd = append(qemuCmd, "-chardev", "pty,id=ttyS0", "-device", "pci-serial,chardev=ttyS0", "-serial", "stdio")
 		qemuCmd = append(qemuCmd, "-kernel", kernelPath)
 		qemuCmd = append(qemuCmd, "-append", fmt.Sprintf("%s console=ttyAMA0", kernelCmdline))
@@ -507,11 +509,13 @@ func main() {
 		}
 	}
 
-	// cpu details
+	// now acceleators speciffied in -machine option, skip -enable-kvm to avoid mess
 	if checkKVM() {
 		log.Printf("using KVM acceleration\n")
 		qemuCmd = append(qemuCmd, "-enable-kvm")
 	}
+
+	// cpu details
 	qemuCmd = append(qemuCmd, "-cpu", "max")
 	qemuCmd = append(qemuCmd, "-smp", strings.Join(cpus, ","))
 
