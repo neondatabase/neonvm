@@ -1,3 +1,11 @@
+# :warning: Repository Moved :warning:
+
+**This repository has been moved to [neondatabase/autoscaling/neonvm](https://github.com/neondatabase/autoscaling/tree/main/neonvm).**
+
+The NeonVM functionality is now a part of the Autoscaling project. All future updates and development will take place in the new project repository.
+
+---
+
 # NeonVM: QEMU-based virtualization API and controlller for Kubernetes
 
 ## Description
@@ -231,7 +239,7 @@ make undeploy
 ## How it works
 This project aims to follow the Kubernetes [Operator pattern](https://kubernetes.io/docs/concepts/extend-kubernetes/operator/)
 
-It uses [Controllers](https://kubernetes.io/docs/concepts/architecture/controller/) 
+It uses [Controllers](https://kubernetes.io/docs/concepts/architecture/controller/)
 which provides a reconcile function responsible for synchronizing resources untile the desired state is reached on the cluster
 
 ## Roadmap
